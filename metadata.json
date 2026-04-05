@@ -1,0 +1,5 @@
+{
+  "name": "Footage Finder",
+  "description": "Upload videos and search for specific scenes using keywords (supports Chinese).",
+  "requestFramePermissions": []
+}
