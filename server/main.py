@@ -191,6 +191,12 @@ async def analyze(req: AnalyzeRequest):
     filepath = await asyncio.to_thread(get_video_path, req.filename)
     history_id = req.history_id or str(int(time.time() * 1000))
     search_keywords = req.keywords.strip()
+    logger.info(
+        "Analyze request: filename=%s history_id=%s keywords=%s",
+        req.filename,
+        history_id,
+        search_keywords or "<empty>",
+    )
 
     async def event_stream():
         full_scenes = None
@@ -224,6 +230,11 @@ async def analyze(req: AnalyzeRequest):
         )
         saved_history = saved["history"]
         version_id = saved["version_id"]
+        logger.info(
+            "Saved full analysis for %s as version %s",
+            req.filename,
+            version_id,
+        )
 
         if search_keywords:
             async for event in search_analysis_stream(full_scenes, search_keywords):
@@ -242,6 +253,21 @@ async def analyze(req: AnalyzeRequest):
                 matched_scenes or [],
                 search_error,
             )
+            if search_error:
+                logger.warning(
+                    "Search result saved with error for %s version=%s keywords=%s: %s",
+                    req.filename,
+                    version_id,
+                    search_keywords,
+                    search_error,
+                )
+            else:
+                logger.info(
+                    "Saved search result for %s version=%s keywords=%s",
+                    req.filename,
+                    version_id,
+                    search_keywords,
+                )
 
         if saved_history is not None:
             yield sse_event("saved", {"history": saved_history})
@@ -265,6 +291,8 @@ async def search(req: SearchRequest):
     if not keywords:
         raise HTTPException(status_code=400, detail="keywords is required")
 
+    logger.info("Search request: version_id=%s keywords=%s", req.version_id, keywords)
+
     full_scenes = await asyncio.to_thread(get_version_scenes, req.version_id)
     if full_scenes is None:
         raise HTTPException(status_code=404, detail="version not found")
@@ -286,6 +314,20 @@ async def search(req: SearchRequest):
         matched_scenes,
         search_error,
     )
+    if search_error:
+        logger.warning(
+            "Search request completed with error for version=%s keywords=%s: %s",
+            req.version_id,
+            keywords,
+            search_error,
+        )
+    else:
+        logger.info(
+            "Search request completed for version=%s keywords=%s with %d matches",
+            req.version_id,
+            keywords,
+            len(matched_scenes),
+        )
     return {"history": saved_history, "searchError": search_error}
 
 

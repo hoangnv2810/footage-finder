@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Film, Play, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Plus, Scissors, Trash2, RefreshCw, ChevronDown, ChevronUp, Terminal, Upload } from 'lucide-react';
+import { Search, Film, Play, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Plus, Scissors, Trash2, RefreshCw, Upload } from 'lucide-react';
 
 // --- Types ---
 
@@ -48,12 +48,6 @@ interface HistoryItem {
   date: number;
   keywords: string;
   videos: VideoResult[];
-}
-
-interface LogMessage {
-  time: string;
-  text: string;
-  type: 'info' | 'chunk' | 'error' | 'success';
 }
 
 // --- API helpers ---
@@ -204,12 +198,10 @@ export default function App() {
   const [trimmingScene, setTrimmingScene] = useState<string | null>(null);
   const [trimStatus, setTrimStatus] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-  // Log panel state
-  const [logs, setLogs] = useState<LogMessage[]>([]);
-  const [isLogOpen, setIsLogOpen] = useState(false);
-  const logEndRef = useRef<HTMLDivElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const playerRefs = useRef<Record<number, HTMLVideoElement | null>>({});
+  const playbackBoundsRef = useRef<Record<number, { end: number }>>({});
+  const pendingSceneRef = useRef<Record<number, Scene | undefined>>({});
   const [isUploading, setIsUploading] = useState(false);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,12 +241,6 @@ export default function App() {
     setVideos(prev => prev.filter((_, i) => i !== index));
   };
 
-  const addLog = useCallback((text: string, type: LogMessage['type'] = 'info') => {
-    const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setLogs(prev => [...prev, { time, text, type }]);
-    setIsLogOpen(true);
-  }, []);
-
   const refreshHistory = useCallback(() => {
     api.history().then(items => setHistory(normalizeHistory(items))).catch(() => {});
   }, []);
@@ -271,10 +257,86 @@ export default function App() {
       .catch(() => {});
   }, [currentSearchId, refreshHistory]);
 
-  // Auto-scroll log panel
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
+  const playScene = useCallback((videoIndex: number, scene: Scene) => {
+    const player = playerRefs.current[videoIndex];
+    if (!player) return;
+
+    pendingSceneRef.current[videoIndex] = scene;
+
+    const seekAndPlay = (targetScene: Scene) => {
+      playbackBoundsRef.current[videoIndex] = { end: targetScene.end };
+      player.pause();
+
+      const startPlayback = () => {
+        pendingSceneRef.current[videoIndex] = undefined;
+        player.play().catch(() => {});
+      };
+
+      const performSeek = () => {
+        if (Math.abs(player.currentTime - targetScene.start) < 0.05) {
+          startPlayback();
+          return;
+        }
+
+        player.addEventListener('seeked', () => {
+          if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            startPlayback();
+          } else {
+            player.addEventListener('canplay', startPlayback, { once: true });
+          }
+        }, { once: true });
+
+        if ('fastSeek' in player) {
+          try {
+            player.fastSeek(targetScene.start);
+            return;
+          } catch {
+            // Fall back to currentTime assignment below.
+          }
+        }
+
+        player.currentTime = targetScene.start;
+      };
+
+      if (player.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        performSeek();
+        return;
+      }
+
+      player.addEventListener('loadedmetadata', performSeek, { once: true });
+      if (player.networkState === HTMLMediaElement.NETWORK_EMPTY) {
+        player.load();
+      }
+    };
+
+    if (player.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      seekAndPlay(scene);
+      return;
+    }
+
+    if (player.networkState === HTMLMediaElement.NETWORK_EMPTY) {
+      player.load();
+    }
+  }, []);
+
+  const handlePlayerTimeUpdate = useCallback((videoIndex: number) => {
+    const player = playerRefs.current[videoIndex];
+    const bounds = playbackBoundsRef.current[videoIndex];
+    if (!player || !bounds) return;
+
+    if (player.currentTime >= bounds.end) {
+      player.pause();
+      player.currentTime = bounds.end;
+      delete playbackBoundsRef.current[videoIndex];
+    }
+  }, []);
+
+  const handlePlayerLoadedMetadata = useCallback((videoIndex: number) => {
+    const pendingScene = pendingSceneRef.current[videoIndex];
+    if (pendingScene) {
+      playScene(videoIndex, pendingScene);
+    }
+  }, [playScene]);
 
   // Load history on mount
   useEffect(() => {
@@ -298,24 +360,16 @@ export default function App() {
     let errorMsg: string | null = null;
 
     await readSSEStream(response, {
-      onLog: (msg) => addLog(msg),
-      onChunk: (content) => addLog(content, 'chunk'),
       onSaved: (data) => { savedHistory = normalizeHistoryItem(data.history); },
-      onError: (msg) => { errorMsg = msg; addLog(msg, 'error'); },
+      onError: (msg) => { errorMsg = msg; },
     });
 
     return { savedHistory, errorMsg };
   };
 
   const searchOnServer = async (versionId: string, filename: string, searchKeywords: string) => {
-    addLog(`--- Tìm trong kết quả phân tích: ${filename} ---`);
     const result = await api.search(versionId, searchKeywords);
     const savedHistory = result.history ? normalizeHistoryItem(result.history) : null;
-    if (result.searchError) {
-      addLog(result.searchError, 'error');
-    } else {
-      addLog(`Hoàn tất tìm kiếm: ${filename}`, 'success');
-    }
     return { savedHistory, searchError: result.searchError || null };
   };
 
@@ -337,7 +391,6 @@ export default function App() {
 
     setIsAnalyzing(true);
     setGlobalError(null);
-    setLogs([]);
 
     const historyId = currentSearchId || Date.now().toString();
     const searchKeywords = keywords.trim();
@@ -379,7 +432,6 @@ export default function App() {
             scenes: [],
             searchError: msg,
           };
-          addLog(`Lỗi: ${msg}`, 'error');
         }
 
         setVideos([...updatedVideos]);
@@ -389,12 +441,9 @@ export default function App() {
       updatedVideos[i] = { ...video, status: 'analyzing', error: undefined };
       setVideos([...updatedVideos]);
 
-      addLog(`--- Bắt đầu phân tích: ${filename} ---`);
-
       try {
         const { savedHistory, errorMsg } = await analyzeOnServer(filename, historyId, searchKeywords);
         if (savedHistory) {
-          addLog(`Hoàn tất: ${filename}`, 'success');
           const serverVideo = getServerVideo(savedHistory, filename);
           updatedVideos[i] = serverVideo || normalizeVideo({ ...updatedVideos[i], status: 'success' });
         } else if (errorMsg) {
@@ -403,7 +452,6 @@ export default function App() {
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Lỗi không xác định';
         updatedVideos[i] = { ...updatedVideos[i], status: 'error', error: msg };
-        addLog(`Lỗi: ${msg}`, 'error');
       }
 
       setVideos([...updatedVideos]);
@@ -426,14 +474,8 @@ export default function App() {
       return next;
     });
 
-    addLog(`--- Phân tích lại: ${video.fileName} ---`);
-
     try {
       const { savedHistory, errorMsg } = await analyzeOnServer(video.fileName, historyId, searchKeywords);
-
-      if (savedHistory) {
-        addLog(`Hoàn tất: ${video.fileName}`, 'success');
-      }
 
       setVideos(prev => {
         const next = [...prev];
@@ -459,7 +501,6 @@ export default function App() {
         next[index] = { ...next[index], status: 'error', error: msg };
         return next;
       });
-      addLog(`Lỗi: ${msg}`, 'error');
     }
   };
 
@@ -563,7 +604,6 @@ export default function App() {
     setVideos([]);
     setCurrentSearchId(null);
     setGlobalError(null);
-    setLogs([]);
   };
 
   const loadHistoryItem = (item: HistoryItem) => {
@@ -886,7 +926,13 @@ export default function App() {
                         <div className="p-4 bg-black/20 flex flex-col justify-center">
                           <video
                             id={`video-player-${idx}`}
+                            ref={(node) => {
+                              playerRefs.current[idx] = node;
+                            }}
                             src={`/api/videos/${encodeURIComponent(video.fileName)}/stream`}
+                            preload="metadata"
+                            onLoadedMetadata={() => handlePlayerLoadedMetadata(idx)}
+                            onTimeUpdate={() => handlePlayerTimeUpdate(idx)}
                             controls
                             className="w-full max-h-[60vh] rounded-lg bg-black object-contain"
                           />
@@ -942,7 +988,16 @@ export default function App() {
                                   return (
                                     <div
                                       key={sIdx}
-                                      className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-indigo-500/30 transition-colors group"
+                                      onClick={() => playScene(idx, scene)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === 'Enter' || event.key === ' ') {
+                                          event.preventDefault();
+                                          playScene(idx, scene);
+                                        }
+                                      }}
+                                      role="button"
+                                      tabIndex={0}
+                                      className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-indigo-500/30 transition-colors group cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                                     >
                                       <div className="flex items-start justify-between mb-2">
                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
@@ -950,12 +1005,9 @@ export default function App() {
                                         </span>
                                         <div className="flex items-center space-x-2">
                                           <button
-                                            onClick={() => {
-                                              const player = document.getElementById(`video-player-${idx}`) as HTMLVideoElement;
-                                              if (player) {
-                                                player.currentTime = scene.start;
-                                                player.play().catch(() => {});
-                                              }
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              playScene(idx, scene);
                                             }}
                                             className="flex items-center text-xs text-zinc-400 hover:text-indigo-400 transition-colors"
                                             title="Phát từ đây"
@@ -971,7 +1023,10 @@ export default function App() {
 
                                       <div className="flex items-center justify-end pt-2 border-t border-zinc-800/50">
                                         <button
-                                          onClick={() => trimAndDownload(video, scene, sIdx)}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            trimAndDownload(video, scene, sIdx);
+                                          }}
                                           disabled={isTrimming}
                                           className="flex items-center text-xs px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
@@ -1000,51 +1055,6 @@ export default function App() {
         </div>
       </div>
 
-      </div>
-
-      {/* Log Panel */}
-      <div className="border-t border-zinc-800 bg-zinc-900/80 backdrop-blur-sm flex-shrink-0">
-        <button
-          onClick={() => setIsLogOpen(!isLogOpen)}
-          className="w-full flex items-center justify-between px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
-        >
-          <div className="flex items-center space-x-2">
-            <Terminal className="w-4 h-4" />
-            <span>Log ({logs.length})</span>
-          </div>
-          {isLogOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-        </button>
-        <AnimatePresence>
-          {isLogOpen && (
-            <motion.div
-              initial={{ height: 0 }}
-              animate={{ height: 200 }}
-              exit={{ height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="h-[200px] overflow-y-auto custom-scrollbar px-4 pb-3 font-mono text-xs space-y-0.5">
-                {logs.length === 0 ? (
-                  <p className="text-zinc-600 pt-4 text-center">Chưa có log nào</p>
-                ) : (
-                  logs.map((log, i) => (
-                    <div key={i} className="flex">
-                      <span className="text-zinc-600 mr-3 flex-shrink-0">{log.time}</span>
-                      <span className={
-                        log.type === 'error' ? 'text-rose-400' :
-                        log.type === 'success' ? 'text-emerald-400' :
-                        log.type === 'chunk' ? 'text-zinc-500' :
-                        'text-zinc-300'
-                      }>
-                        {log.text}
-                      </span>
-                    </div>
-                  ))
-                )}
-                <div ref={logEndRef} />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

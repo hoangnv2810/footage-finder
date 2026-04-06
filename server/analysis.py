@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import os
 import re
 from collections.abc import AsyncGenerator
@@ -13,6 +14,7 @@ ANALYSIS_MODEL = "qwen3.6-plus"
 DASHSCOPE_CHAT_URL = (
     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
 )
+logger = logging.getLogger(__name__)
 
 
 def _get_api_key() -> str:
@@ -149,10 +151,12 @@ async def analyze_video_stream(filepath: Path) -> AsyncGenerator[str, None]:
     try:
         _get_api_key()
     except ValueError as exc:
+        logger.error("Missing DASHSCOPE_API_KEY for full analysis")
         yield sse_event("error", {"message": str(exc)})
         return
 
     size_mb = round(filepath.stat().st_size / (1024 * 1024), 1)
+    logger.info("Reading video %s (%.1f MB)", filepath.name, size_mb)
     yield sse_event(
         "log", {"message": f"Đang đọc video {filepath.name} ({size_mb} MB)..."}
     )
@@ -164,6 +168,9 @@ async def analyze_video_stream(filepath: Path) -> AsyncGenerator[str, None]:
     del b64
 
     try:
+        logger.info(
+            "Starting full analysis for %s with model %s", filepath.name, ANALYSIS_MODEL
+        )
         yield sse_event(
             "log", {"message": f"Đang phân tích toàn bộ video bằng {ANALYSIS_MODEL}..."}
         )
@@ -174,12 +181,16 @@ async def analyze_video_stream(filepath: Path) -> AsyncGenerator[str, None]:
             ]
         )
         scenes = extract_scenes(response_text)
+        logger.info(
+            "Full analysis finished for %s with %d scenes", filepath.name, len(scenes)
+        )
         yield sse_event(
             "log",
             {"message": f"Đã phân tích xong {len(scenes)} phân cảnh toàn bộ video"},
         )
         yield sse_event("full_result", {"scenes": scenes})
     except Exception as exc:
+        logger.exception("Full analysis failed for %s", filepath.name)
         yield sse_event("error", {"message": str(exc)})
 
 
@@ -190,10 +201,12 @@ async def search_analysis_stream(
     try:
         _get_api_key()
     except ValueError as exc:
+        logger.error("Missing DASHSCOPE_API_KEY for search analysis")
         yield sse_event("search_error", {"message": str(exc)})
         return
 
     try:
+        logger.info("Starting search-from-analysis for keywords: %s", keywords)
         yield sse_event(
             "log",
             {
@@ -204,9 +217,15 @@ async def search_analysis_stream(
             create_search_prompt(scenes, keywords)
         )
         matched_scenes = extract_scenes(response_text)
+        logger.info(
+            "Search-from-analysis finished for keywords %s with %d matches",
+            keywords,
+            len(matched_scenes),
+        )
         yield sse_event(
             "log", {"message": f"Tìm thấy {len(matched_scenes)} phân cảnh khớp từ khóa"}
         )
         yield sse_event("search_result", {"scenes": matched_scenes})
     except Exception as exc:
+        logger.exception("Search-from-analysis failed for keywords %s", keywords)
         yield sse_event("search_error", {"message": str(exc)})
