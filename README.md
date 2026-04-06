@@ -15,6 +15,6 @@ View your app in AI Studio: https://ai.studio/apps/912565ad-fe07-4519-b9aa-4dff4
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Set the `DASHSCOPE_API_KEY` in `.env.local` to your DashScope API key with access to `qwen3.6-plus`
 3. Run the app:
    `npm run dev`
