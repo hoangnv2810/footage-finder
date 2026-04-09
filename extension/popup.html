@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Footage Finder Importer</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <h1>Footage Finder</h1>
+      <p class="subtitle">Import JSON scene analysis from chat.qwen.ai</p>
+
+      <section class="panel info-panel">
+        <div class="row">
+          <span class="label">Filename</span>
+          <span id="filename" class="value">-</span>
+        </div>
+        <div id="filename-input-row" class="row filename-input-row hidden">
+          <span class="label">Manual</span>
+          <div class="filename-input-group">
+            <input
+              id="filename-manual"
+              type="text"
+              class="filename-input"
+              placeholder="video.mp4"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <datalist id="video-list"></datalist>
+          </div>
+        </div>
+        <div id="response-selector-row" class="row hidden">
+          <span class="label">Response</span>
+          <select id="response-selector" class="response-select"></select>
+        </div>
+        <div class="row">
+          <span class="label">Scenes</span>
+          <span id="scene-count" class="value">-</span>
+        </div>
+        <div class="row">
+          <span class="label">Status</span>
+          <span id="status-pill" class="pill neutral">Waiting</span>
+        </div>
+      </section>
+
+      <section id="preview-section" class="hidden">
+        <div class="preview-toolbar">
+          <span class="label">Preview</span>
+          <div class="preview-tabs">
+            <button id="tab-scenes" type="button" class="tab-btn active">Scenes</button>
+            <button id="tab-json" type="button" class="tab-btn">Raw JSON</button>
+          </div>
+        </div>
+
+        <div id="preview-scenes" class="panel preview-panel">
+          <div id="scene-list" class="scene-list"></div>
+        </div>
+
+        <div id="preview-json" class="panel preview-panel hidden">
+          <pre id="json-raw" class="json-raw"></pre>
+        </div>
+      </section>
+
+      <section class="actions">
+        <button id="copy-prompt" type="button">Copy prompt</button>
+        <button id="refresh" type="button">Check current result</button>
+        <button id="save" type="button" disabled>Save to Footage Finder</button>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="log-header">
+          <span class="label">Log</span>
+          <button id="copy-log" type="button" class="copy-log-btn">Copy log</button>
+        </div>
+        <pre id="message" class="log-area">Open a chat.qwen.ai tab with a finished JSON response.</pre>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

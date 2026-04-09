@@ -6,7 +6,8 @@ import shutil
 import subprocess
 import tempfile
 import time
-from typing import List
+from pathlib import Path
+from typing import Any, List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -15,15 +16,23 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
-from analysis import analyze_video_stream, search_analysis_stream
+from analysis import (
+    analyze_video_stream,
+    generate_storyboard,
+    get_model_config,
+    search_analysis_stream,
+    validate_import_scenes,
+)
 from db import (
     delete_history,
     get_version_scenes,
+    get_video_versions_for_storyboard,
     init_db,
     list_history,
     save_analysis,
     save_analysis_error,
     save_history,
+    save_import_analysis,
     save_search_result,
     save_video_file,
     update_video_selection,
@@ -42,7 +51,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origin_regex=r"chrome-extension://.*|moz-extension://.*",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -73,6 +83,7 @@ async def health():
 
 @app.get("/api/config")
 async def config():
+    models = get_model_config()
     video_folder = os.environ.get("VIDEO_FOLDER", "")
     try:
         videos = scan_folder()
@@ -80,14 +91,16 @@ async def config():
             "video_folder": video_folder,
             "video_folder_configured": True,
             "video_count": len(videos),
-            "model": "qwen3.6-plus",
+            "model": models["video_analysis_model"],
+            "models": models,
         }
     except ValueError:
         return {
             "video_folder": video_folder,
             "video_folder_configured": False,
             "video_count": 0,
-            "model": "qwen3.6-plus",
+            "model": models["video_analysis_model"],
+            "models": models,
         }
 
 
@@ -163,11 +176,27 @@ class SearchRequest(BaseModel):
     keywords: str
 
 
+class ImportAnalysisRequest(BaseModel):
+    filename: str
+    scenes: list[dict[str, Any]]
+    source: str = "chat.qwen.ai"
+
+
 class SelectionPayload(BaseModel):
     history_id: str
     filename: str
     current_version_index: int
     current_search_keywords: str = ""
+
+
+class StoryboardRequest(BaseModel):
+    product_name: str
+    category: str = ""
+    target_audience: str = ""
+    tone: str = ""
+    key_benefits: str = ""
+    script_text: str
+    selected_version_ids: list[str]
 
 
 def _parse_sse_event(event: str) -> tuple[str | None, dict | None]:
@@ -184,6 +213,63 @@ def _parse_sse_event(event: str) -> tuple[str | None, dict | None]:
                 payload = None
 
     return event_name, payload
+
+
+def _resolve_library_filename(filename: str) -> str:
+    requested = Path(filename.strip()).name
+    if not requested:
+        raise ValueError("filename is required")
+
+    videos = scan_folder()
+    for video in videos:
+        if video["filename"] == requested:
+            return video["filename"]
+
+    if os.name == "nt":
+        requested_folded = requested.casefold()
+        for video in videos:
+            if video["filename"].casefold() == requested_folded:
+                return video["filename"]
+
+    raise FileNotFoundError(f"Video not found in library: {requested}")
+
+
+@app.post("/api/import-analysis")
+async def import_analysis(req: ImportAnalysisRequest):
+    logger.info(
+        "Import analysis request: filename=%s source=%s scenes=%d",
+        req.filename,
+        req.source or "<empty>",
+        len(req.scenes),
+    )
+
+    try:
+        resolved_filename = await asyncio.to_thread(
+            _resolve_library_filename, req.filename
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    try:
+        scenes = validate_import_scenes(req.scenes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        video_path = await asyncio.to_thread(get_video_path, resolved_filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    stat = await asyncio.to_thread(video_path.stat)
+    await asyncio.to_thread(
+        save_video_file, resolved_filename, stat.st_size, stat.st_mtime
+    )
+    saved = await asyncio.to_thread(save_import_analysis, resolved_filename, scenes)
+    return saved
 
 
 @app.post("/api/analyze")
@@ -329,6 +415,42 @@ async def search(req: SearchRequest):
             len(matched_scenes),
         )
     return {"history": saved_history, "searchError": search_error}
+
+
+@app.post("/api/storyboard/generate")
+async def storyboard_generate(req: StoryboardRequest):
+    if not req.script_text.strip():
+        raise HTTPException(status_code=400, detail="script_text is required")
+    if not req.selected_version_ids:
+        raise HTTPException(status_code=400, detail="selected_version_ids is required")
+
+    logger.info(
+        "Storyboard request: product=%s selected_versions=%d",
+        req.product_name or "<empty>",
+        len(req.selected_version_ids),
+    )
+
+    candidate_versions = await asyncio.to_thread(
+        get_video_versions_for_storyboard, req.selected_version_ids
+    )
+    if not candidate_versions:
+        raise HTTPException(status_code=404, detail="No analyzed video versions found")
+
+    product = {
+        "name": req.product_name.strip(),
+        "category": req.category.strip(),
+        "target_audience": req.target_audience.strip(),
+        "tone": req.tone.strip(),
+        "key_benefits": req.key_benefits.strip(),
+    }
+
+    try:
+        result = await generate_storyboard(
+            product, req.script_text.strip(), candidate_versions
+        )
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # --- Trim ---

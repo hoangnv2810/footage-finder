@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
+IMPORT_HISTORY_PREFIX = "import:"
 
 _local = threading.local()
 
@@ -213,6 +214,10 @@ def _get_history_item(history_id: str) -> dict | None:
     return _history_item_from_row(conn, row)
 
 
+def _import_history_id(filename: str) -> str:
+    return f"{IMPORT_HISTORY_PREFIX}{filename}"
+
+
 def save_history(item: dict[str, Any]) -> dict:
     conn = _get_conn()
     existing = conn.execute(
@@ -367,6 +372,65 @@ def save_analysis(
     return {"history": _get_history_item(history_id), "version_id": version_id}
 
 
+def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
+    conn = _get_conn()
+    now = int(time.time() * 1000)
+    history_id = _import_history_id(filename)
+
+    existing_history = conn.execute(
+        "SELECT id FROM history WHERE id = ?", (history_id,)
+    ).fetchone()
+    if existing_history:
+        conn.execute(
+            "UPDATE history SET date = ?, keywords = '' WHERE id = ?",
+            (now, history_id),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO history (id, date, keywords) VALUES (?, ?, '')",
+            (history_id, now),
+        )
+
+    hv = conn.execute(
+        "SELECT id FROM history_video WHERE history_id = ? AND file_name = ?",
+        (history_id, filename),
+    ).fetchone()
+
+    if hv:
+        video_id = hv["id"]
+    else:
+        cur = conn.execute(
+            """
+            INSERT INTO history_video (
+                history_id, file_name, status, current_version_index, current_search_keywords
+            ) VALUES (?, ?, 'success', 0, '')
+            """,
+            (history_id, filename),
+        )
+        video_id = cur.lastrowid
+
+    version_id = str(now)
+    conn.execute(
+        "INSERT INTO video_version (id, video_id, timestamp, keywords, scenes) VALUES (?, ?, ?, '', ?)",
+        (version_id, video_id, now, json.dumps(scenes, ensure_ascii=False)),
+    )
+
+    version_count = conn.execute(
+        "SELECT COUNT(*) as cnt FROM video_version WHERE video_id = ?", (video_id,)
+    ).fetchone()["cnt"]
+    conn.execute(
+        """
+        UPDATE history_video
+        SET status = 'success', error = NULL, current_version_index = ?, current_search_keywords = ''
+        WHERE id = ?
+        """,
+        (version_count - 1, video_id),
+    )
+
+    conn.commit()
+    return {"history": _get_history_item(history_id), "version_id": version_id}
+
+
 def get_version_scenes(version_id: str) -> list[dict] | None:
     conn = _get_conn()
     row = conn.execute(
@@ -375,6 +439,35 @@ def get_version_scenes(version_id: str) -> list[dict] | None:
     if not row:
         return None
     return json.loads(row["scenes"])
+
+
+def get_video_versions_for_storyboard(version_ids: list[str]) -> list[dict]:
+    if not version_ids:
+        return []
+
+    conn = _get_conn()
+    placeholders = ",".join("?" for _ in version_ids)
+    rows = conn.execute(
+        f"""
+        SELECT vv.id AS version_id, vv.timestamp, vv.scenes, hv.file_name
+        FROM video_version vv
+        JOIN history_video hv ON hv.id = vv.video_id
+        WHERE vv.id IN ({placeholders})
+        """,
+        version_ids,
+    ).fetchall()
+
+    by_id = {
+        row["version_id"]: {
+            "versionId": row["version_id"],
+            "timestamp": row["timestamp"],
+            "fileName": row["file_name"],
+            "scenes": json.loads(row["scenes"]),
+        }
+        for row in rows
+    }
+
+    return [by_id[version_id] for version_id in version_ids if version_id in by_id]
 
 
 def save_search_result(

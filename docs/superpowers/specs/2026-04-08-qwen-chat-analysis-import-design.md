@@ -345,34 +345,87 @@ Thiết kế này làm cho import từ `chat.qwen.ai` trở thành một nguồn
 - không làm hỏng DB
 - chỉ cần refresh history để nhìn thấy version mới
 
-## UX tối thiểu của extension
+## UX của extension
 
-Vòng đầu chỉ cần 3 action:
+Extension cung cấp 5 thành phần chính trong popup:
 
-1. `Copy prompt chuẩn`
+### 1. Copy prompt chuẩn
 
 - cung cấp prompt cố định cho người dùng paste vào chat
+- prompt đã được nhúng sẵn trong extension
 
-2. `Kiểm tra kết quả hiện tại`
+### 2. Kiểm tra kết quả (Check current result)
 
-- đọc câu trả lời assistant mới nhất
-- parse JSON
+- đọc **tất cả** câu trả lời assistant trong phiên chat hiện tại
+- parse từng JSON response riêng biệt
+- loại bỏ bản trùng bằng signature (scene count + first/last keyword)
 - hiển thị filename đang map tới và số scene đọc được
+- nếu phiên chat có nhiều JSON response → hiện dropdown "Response" cho người dùng chọn
+- nếu filename không detect được → hiện input thủ công với datalist gợi ý từ backend
 
-3. `Lưu vào Footage Finder`
+### 3. Preview panel (2 tabs)
 
-- chỉ bật khi parse hợp lệ
-- gửi payload sang local backend import API
+Preview cho phép xem toàn bộ dữ liệu JSON trước khi lưu:
+
+#### Tab Scenes (visual)
+- hiển thị danh sách scene cards, mỗi card gồm: index, keyword, timing (start → end)
+- click vào scene card để expand xem toàn bộ fields: description, context, mood, shot_type, subjects, actions, marketing_uses, relevance_notes
+- tags hiển thị dạng chip cho subjects, actions, marketing_uses
+- click lần nữa để collapse
+
+#### Tab Raw JSON
+- hiển thị toàn bộ JSON raw data trong format monospace
+- cho phép verify dữ liệu chính xác trước khi import
+- hữu ích khi cần copy/paste hoặc debug
+
+### 4. Response selector (cho multi-response chat)
+
+- khi phiên chat có nhiều JSON array (ví dụ: phân tích lại, nhiều video trong cùng chat)
+- dropdown hiển thị: "Response 1 — 8 scene(s)", "Response 2 — 5 scene(s)"
+- chọn response khác sẽ cập nhật preview và scene count
+- response được sắp xếp theo số scene giảm dần (nhiều nhất lên đầu)
+
+### 5. Lưu vào Footage Finder (Save)
+
+- chỉ bật khi parse hợp lệ và có filename
+- gửi payload của response đang chọn sang local backend import API
 - hiển thị kết quả thành công hoặc lỗi cụ thể
 
-UX này cố ý tránh scope lớn như tự attach file, auto-send prompt, auto-detect thời điểm model chạy xong, hoặc quản lý nhiều chat tabs phức tạp.
+### Manual filename input
+
+- chat.qwen.ai **không render video filename** vào DOM text (video chỉ hiện dạng thumbnail)
+- extension tự động hiện ô nhập manual khi filename không detect được
+- input kèm datalist fetch từ `/api/videos` để gợi ý file đã có trong thư viện
+- người dùng nhập tên file → click Check lại hoặc nhập rồi Save trực tiếp
+
+## Xử lý DOM chat.qwen.ai
+
+### Đặc thù DOM cần xử lý
+
+- Qwen **không dùng** `<pre>` hoặc `<code>` cho code blocks
+- JSON được render bằng hàng trăm `<span>` syntax-highlighted lồng nhau
+- Line numbers (1, 2, 3...) được inject vào DOM và merge vào `innerText`
+- Container chính là `#chat-messages-scroll-container` hoặc `.chat-messages`
+- Không có `data-message-author-role` hoặc attribute phân biệt user/assistant
+- Video filename không xuất hiện trong text — chỉ hiện thumbnail với duration
+
+### Chiến lược extract
+
+1. Tìm element có label "json" → scan sibling/parent để lấy code body
+2. Scan chat container → tìm div có scene markers
+3. Fallback: scan pre/code rồi toàn bộ page
+4. Với mỗi candidate text: strip line-number-only lines, bỏ prefix "json", extract `[...]` substring
+5. Parse nhiều variant (cleaned, sliced, aggressive strip, fenced block, regex rebuild)
+6. Deduplicate kết quả bằng signature trước khi hiển thị
 
 ## Ranh giới trách nhiệm
 
 ### Extension
 
 - đọc DOM của `chat.qwen.ai`
-- parse dữ liệu đầu ra
+- strip line numbers và noise từ Qwen code block rendering
+- parse tất cả JSON response trong phiên chat
+- hiển thị preview và cho phép chọn response
 - gửi request import
 - hiển thị trạng thái import
 
@@ -393,21 +446,25 @@ UX này cố ý tránh scope lớn như tự attach file, auto-send prompt, auto
 Minimum manual verification sau khi implement:
 
 1. Dùng prompt chuẩn trên `chat.qwen.ai` với một video và xác nhận model trả JSON array hợp lệ.
-2. Extension đọc đúng `filename` và số scene từ câu trả lời assistant mới nhất.
-3. Import thành công tạo ra một `video_version` mới trong DB cho đúng video.
-4. Reload app và xác nhận version mới xuất hiện trong history/video versions.
-5. Chạy keyword search trên version vừa import và xác nhận app dùng được scenes đã lưu.
-6. Xác nhận storyboard có thể lấy version vừa import làm candidate scenes.
-7. Xác nhận trim/export vẫn hoạt động trên scenes của version vừa import.
-8. Kiểm tra lỗi rõ ràng cho ba case chính: không đọc được filename, JSON không hợp lệ, filename không tồn tại trong thư viện video hiện tại.
+2. Extension detect và parse được JSON scenes từ code block của Qwen (bao gồm strip line numbers).
+3. Với phiên chat có nhiều JSON response: dropdown Response hiển thị đúng số response và scene count.
+4. Preview panel hiển thị đúng keyword, timing, và description cho từng scene.
+5. Khi filename không detect được: manual input xuất hiện và datalist gợi ý đúng danh sách video.
+6. Import thành công tạo ra một `video_version` mới trong DB cho đúng video.
+7. Reload app và xác nhận version mới xuất hiện trong history/video versions.
+8. Chạy keyword search trên version vừa import và xác nhận app dùng được scenes đã lưu.
+9. Xác nhận storyboard có thể lấy version vừa import làm candidate scenes.
+10. Xác nhận trim/export vẫn hoạt động trên scenes của version vừa import.
+11. Kiểm tra lỗi rõ ràng cho các case: không tìm thấy JSON, JSON parse lỗi, filename không tồn tại trong thư viện.
 
 ## Scope check
 
 Spec này tập trung vào một sub-project đủ gọn cho một implementation plan:
 
-- tạo extension import bán tự động
+- tạo extension import bán tự động với preview và multi-response support
 - tạo import API ở backend
 - nối kết quả vào hệ version hiện có
+- xử lý đặc thù DOM của chat.qwen.ai (line numbers, no filename, no pre/code)
 
 Spec không ôm thêm các bài toán lớn hơn như session automation, upload đồng bộ hai nơi, hoặc đồng bộ prompt/model settings giữa app và `chat.qwen.ai` beyond prompt template chuẩn.
 
