@@ -1,11 +1,35 @@
+# Dependencies
 node_modules/
+
+# Build output
 build/
 dist/
+
+# Test
 coverage/
-.DS_Store
-*.log
+
+# Environment
 .env*
 !.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+
+# Database (SQLite)
 server/data.db
 server/data.db-wal
 server/data.db-shm
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
