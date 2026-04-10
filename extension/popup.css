@@ -17,7 +17,10 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  padding: 16px;
+  max-height: 600px;
+  padding: 16px 16px 20px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* --- Custom Scrollbar --- */

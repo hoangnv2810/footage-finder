@@ -3,7 +3,7 @@
   "name": "Footage Finder Importer",
   "version": "0.1.0",
   "description": "Import Qwen chat video analysis into Footage Finder.",
-  "permissions": ["activeTab", "tabs", "clipboardWrite", "scripting"],
+  "permissions": ["activeTab", "tabs", "clipboardWrite", "clipboardRead", "scripting"],
   "host_permissions": [
     "https://chat.qwen.ai/*",
     "http://127.0.0.1:8000/*",
