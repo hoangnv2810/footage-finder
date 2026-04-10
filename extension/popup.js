@@ -36,14 +36,14 @@ let activeTab = "scenes"; // "scenes" | "json"
 let activeBackendUrl = null;
 
 // ─── DOM ───
-const filenameEl = document.getElementById("filename");
-const filenameInputRow = document.getElementById("filename-input-row");
 const filenameManualInput = document.getElementById("filename-manual");
-const videoListDatalist = document.getElementById("video-list");
+const filenameClearBtn = document.getElementById("filename-clear");
+const videoPreviewBtn = document.getElementById("video-preview-btn");
+const autocompleteList = document.getElementById("autocomplete-list");
+const videoPreviewContainer = document.getElementById("video-preview-container");
+const videoPreview = document.getElementById("video-preview");
 const responseSelectorRow = document.getElementById("response-selector-row");
 const responseSelector = document.getElementById("response-selector");
-const sceneCountEl = document.getElementById("scene-count");
-const statusPillEl = document.getElementById("status-pill");
 const messageEl = document.getElementById("message");
 const previewSection = document.getElementById("preview-section");
 const sceneListEl = document.getElementById("scene-list");
@@ -56,12 +56,32 @@ const saveButton = document.getElementById("save");
 const refreshButton = document.getElementById("refresh");
 const copyPromptButton = document.getElementById("copy-prompt");
 const copyLogButton = document.getElementById("copy-log");
+const pinPopupBtn = document.getElementById("pin-popup");
+
+// Mode selection refs
+const modeAutoBtn = document.getElementById("mode-auto-btn");
+const modeManualBtn = document.getElementById("mode-manual-btn");
+const modeAutoContainer = document.getElementById("mode-auto-container");
+const modeManualContainer = document.getElementById("mode-manual-container");
+const manualTextarea = document.getElementById("manual-textarea");
+const togglePreviewBtn = document.getElementById("toggle-preview-btn");
 
 // ─── Helpers ───
 function setStatus(kind, msg) {
-  statusPillEl.className = `pill ${kind}`;
-  statusPillEl.textContent = kind === "success" ? "Ready" : kind === "error" ? "Error" : kind === "loading" ? "Working" : "Waiting";
-  messageEl.textContent = msg;
+  if (messageEl.textContent === "Open a chat.qwen.ai tab with a finished JSON response." || messageEl.textContent === "Waiting...") {
+    messageEl.textContent = "";
+  }
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+  let prefix = 'ℹ️';
+  if (kind === 'error') prefix = '❌';
+  if (kind === 'success') prefix = '✅';
+  if (kind === 'loading') prefix = '⏳';
+  if (kind === 'neutral') prefix = '⚠️';
+  
+  const line = `[${timeStr}] ${prefix} ${msg}\n`;
+  messageEl.textContent = line + messageEl.textContent;
+  messageEl.scrollTop = 0;
 }
 
 const SCENE_KEY_ORDER = [
@@ -82,12 +102,21 @@ function reorderSceneKeys(scene) {
 }
 
 function setDetails(filename, sceneCount) {
-  filenameEl.textContent = filename || "-";
-  sceneCountEl.textContent = typeof sceneCount === "number" ? String(sceneCount) : "-";
+  if (filename && filename !== "⚠ Manual entry needed" && filename !== "-") {
+    if (!filenameManualInput.value) {
+      filenameManualInput.value = filename;
+    }
+  }
 }
 
 function getManualFilename() {
-  return (filenameManualInput.value || "").trim() || null;
+  let val = (filenameManualInput.value || "").trim();
+  if (!val) return null;
+  // Auto-append .mp4 if no video extension
+  if (!/\.(mp4|mov|avi|mkv|webm)$/i.test(val)) {
+    val += ".mp4";
+  }
+  return val;
 }
 
 function getSelectedResponse() {
@@ -121,6 +150,7 @@ function renderPreview(scenes) {
     previewSection.classList.add("hidden");
     return;
   }
+  // Remove hidden by default, unless overridden by caller later
   previewSection.classList.remove("hidden");
 
   // Scene list tab
@@ -240,17 +270,90 @@ async function fetchAvailableVideos() {
   } catch { return []; }
 }
 
+let allVideoFiles = [];
+
 async function populateVideoList() {
-  const videos = await fetchAvailableVideos();
-  videoListDatalist.innerHTML = "";
-  videos.forEach((fn) => {
-    const opt = document.createElement("option");
-    opt.value = fn;
-    videoListDatalist.appendChild(opt);
-  });
-  if (videos.length > 0) filenameManualInput.setAttribute("list", "video-list");
+  allVideoFiles = await fetchAvailableVideos();
+  updateFilenameButtons();
 }
 
+function renderAutocomplete(filterText = "") {
+  autocompleteList.innerHTML = "";
+  if (!allVideoFiles.length) { autocompleteList.classList.add("hidden"); return; }
+  const match = filterText.toLowerCase();
+  const filtered = match
+    ? allVideoFiles.filter(fn => fn.toLowerCase().includes(match))
+    : allVideoFiles;
+
+  if (filtered.length === 0) {
+    autocompleteList.classList.add("hidden");
+    return;
+  }
+
+  autocompleteList.classList.remove("hidden");
+
+  filtered.forEach(fn => {
+    const d = document.createElement("div");
+    d.className = "autocomplete-item";
+    d.textContent = fn;
+    d.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      filenameManualInput.value = fn;
+      autocompleteList.classList.add("hidden");
+      updateFilenameButtons();
+      hideVideoPreview();
+      checkSaveReady();
+      if (latestExtraction) {
+        const r = getSelectedResponse();
+        if (r) setStatus("success", `${r.sceneCount} scene(s) ready. Save when ready.`);
+      }
+    });
+    autocompleteList.appendChild(d);
+  });
+}
+
+function updateFilenameButtons() {
+  const val = filenameManualInput.value.trim();
+  // Show/hide clear button
+  if (val) {
+    filenameClearBtn.classList.remove("hidden");
+  } else {
+    filenameClearBtn.classList.add("hidden");
+  }
+  // Show/hide preview button (only if exact match in library)
+  if (val && allVideoFiles.includes(val) && activeBackendUrl) {
+    videoPreviewBtn.classList.remove("hidden");
+  } else {
+    videoPreviewBtn.classList.add("hidden");
+    hideVideoPreview();
+  }
+}
+
+function showVideoPreview(filename) {
+  if (!activeBackendUrl) return;
+  videoPreview.src = `${activeBackendUrl}/api/videos/${encodeURIComponent(filename)}/stream`;
+  videoPreviewContainer.classList.remove("hidden");
+  videoPreviewBtn.textContent = "⏹";
+  videoPreviewBtn.title = "Hide preview";
+}
+
+function hideVideoPreview() {
+  videoPreview.pause();
+  videoPreview.src = "";
+  videoPreviewContainer.classList.add("hidden");
+  videoPreviewBtn.textContent = "▶";
+  videoPreviewBtn.title = "Preview video";
+}
+
+function toggleVideoPreview() {
+  const fn = filenameManualInput.value.trim();
+  if (!videoPreviewContainer.classList.contains("hidden")) {
+    hideVideoPreview();
+  } else if (fn && allVideoFiles.includes(fn)) {
+    showVideoPreview(fn);
+  }
+}
 // ─── Tab & extraction ───
 async function getActiveChatTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -489,10 +592,8 @@ async function refreshExtraction() {
     updateResponseSelector();
 
     if (!resolvedName) {
-      filenameInputRow.classList.remove("hidden");
-      setDetails("⚠ Not detected", resp.sceneCount);
+      setDetails("⚠ Manual entry needed", resp.sceneCount);
     } else {
-      filenameInputRow.classList.add("hidden");
       setDetails(resolvedName, resp.sceneCount);
     }
 
@@ -510,7 +611,6 @@ async function refreshExtraction() {
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error.";
     if (msg.includes("filename") || msg.includes("Không tìm")) {
-      filenameInputRow.classList.remove("hidden");
       populateVideoList();
     }
     setStatus("error", msg);
@@ -528,7 +628,12 @@ async function copyPrompt() {
 
 async function postImport(baseUrl, payload) {
   const res = await fetch(`${baseUrl}${IMPORT_API_PATH}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-  if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.detail || `Import failed (${res.status}).`); }
+  if (!res.ok) { 
+    const d = await res.json().catch(() => null); 
+    const err = new Error(d?.detail || `Import failed (${res.status}).`); 
+    err.isHttpError = true;
+    throw err;
+  }
   return res.json();
 }
 
@@ -536,40 +641,222 @@ async function saveImport() {
   const resp = getSelectedResponse();
   if (!resp) { setStatus("error", 'Click "Check current result" first.'); return; }
   const fn = getManualFilename() || (latestExtraction && latestExtraction.filename);
-  if (!fn) { filenameInputRow.classList.remove("hidden"); setStatus("error", "Filename required."); return; }
+  if (!fn) { setStatus("error", "Filename required."); return; }
 
   saveButton.disabled = true;
-  setStatus("loading", `Importing ${resp.sceneCount} scenes for "${fn}"...`);
+  saveButton.innerHTML = `<span class="spinner"></span> Saving...`;
+  
+  setStatus("loading", `Importing ${resp.sceneCount} scenes...`);
 
   let lastErr = null;
+  let isSuccess = false;
+  let finalMsg = "";
+  let isDuplicate = false;
+
   for (const url of BACKEND_URLS) {
     try {
       const result = await postImport(url, { filename: fn, scenes: resp.scenes, source: "chat.qwen.ai" });
       activeBackendUrl = url;
-      setStatus("success", `Import complete! Version ${result.version_id} for "${fn}".\nRefresh the app to see it.`);
-      saveButton.disabled = false;
-      return;
-    } catch (e) { lastErr = e; }
+      isDuplicate = result.is_duplicate === true;
+      if (isDuplicate) {
+        finalMsg = `No changes detected. Existing version ${result.version_id} kept for "${fn}".`;
+      } else {
+        finalMsg = `Import complete! Version ${result.version_id} for "${fn}".`;
+      }
+      isSuccess = true;
+      break;
+    } catch (e) { 
+      lastErr = e; 
+      if (e.isHttpError) break;
+    }
   }
-  setStatus("error", lastErr instanceof Error ? lastErr.message : "Backend unreachable.");
-  saveButton.disabled = false;
+
+  if (isSuccess) {
+    if (isDuplicate) {
+      setStatus("neutral", finalMsg);
+      saveButton.innerHTML = `⚠️ No changes`;
+      saveButton.classList.add("btn-secondary");
+      setTimeout(() => {
+        saveButton.classList.remove("btn-secondary");
+        saveButton.innerHTML = `Save`;
+        checkSaveReady();
+      }, 2500);
+    } else {
+      setStatus("success", finalMsg);
+      saveButton.innerHTML = `<span class="checkmark">✓</span> Success`;
+      saveButton.classList.add("btn-success");
+      
+      // Clear data on success
+      manualTextarea.value = "";
+      filenameManualInput.value = "";
+      latestExtraction = null;
+      hideVideoPreview();
+      updateFilenameButtons();
+      previewSection.classList.add("hidden");
+      togglePreviewBtn.classList.add("hidden");
+      
+      setTimeout(() => {
+        saveButton.classList.remove("btn-success");
+        saveButton.innerHTML = `Save`;
+        checkSaveReady();
+      }, 2500);
+    }
+  } else {
+    setStatus("error", lastErr instanceof Error ? lastErr.message : "Backend unreachable.");
+    saveButton.innerHTML = `Save`;
+    saveButton.disabled = false;
+  }
+}
+
+function setMode(mode) {
+  if (mode === "auto") {
+    modeAutoBtn.classList.add("active");
+    modeManualBtn.classList.remove("active");
+    modeAutoContainer.classList.remove("hidden");
+    modeManualContainer.classList.add("hidden");
+    refreshExtraction();
+  } else {
+    modeManualBtn.classList.add("active");
+    modeAutoBtn.classList.remove("active");
+    modeManualContainer.classList.remove("hidden");
+    modeAutoContainer.classList.add("hidden");
+    previewSection.classList.add("hidden");
+    saveButton.disabled = true;
+    setStatus("Waiting", "Manual mode: Paste JSON into the box and click Load.");
+    setDetails("-", null);
+    populateVideoList();
+  }
+}
+
+function loadManualJson() {
+  saveButton.disabled = true;
+  latestExtraction = null;
+  selectedResponseIndex = 0;
+  expandedScenes.clear();
+  setStatus("loading", "Processing text...");
+  setDetails("-", null);
+  previewSection.classList.add("hidden");
+  responseSelectorRow.classList.add("hidden");
+
+  let text = manualTextarea.value.trim();
+  if (!text) {
+    setStatus("error", "Please paste JSON text first.");
+    return;
+  }
+
+  // Handle Markdown code block fences
+  const fm = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fm && fm[1]) {
+    text = fm[1].trim();
+  } else {
+    // Attempt standard array slicing just in case
+    const a = text.indexOf("[");
+    const b = text.lastIndexOf("]");
+    if (a !== -1 && b > a) {
+      text = text.slice(a, b + 1);
+    }
+  }
+
+  let scenes = null;
+  try {
+    scenes = JSON.parse(text);
+  } catch (err) {
+    manualTextarea.value = "";
+    setStatus("error", "Could not parse JSON. Paste must be valid JSON array.");
+    return;
+  }
+
+  if (!Array.isArray(scenes) || scenes.length === 0) {
+    manualTextarea.value = "";
+    setStatus("error", "Parsed JSON is not a valid scenes array.");
+    return;
+  }
+
+  const reorderedScenes = scenes.map(reorderSceneKeys);
+  
+  // Mock extraction result for the manual JSON
+  latestExtraction = {
+    filename: null,
+    filenameAutoDetected: false,
+    allResponses: [{
+      scenes: reorderedScenes,
+      sceneCount: reorderedScenes.length,
+      rawText: text
+    }],
+    selectedIndex: 0
+  };
+  
+  selectedResponseIndex = 0;
+  const resp = getSelectedResponse();
+  const resolvedName = getManualFilename();
+  updateResponseSelector(); // will hide since only 1 response
+  
+  if (!resolvedName) {
+    setDetails("⚠ Manual entry needed", resp.sceneCount);
+  } else {
+    setDetails(resolvedName, resp.sceneCount);
+  }
+  
+  renderPreview(resp.scenes);
+  // Manual mode user preference: keep preview hidden
+  previewSection.classList.add("hidden");
+  togglePreviewBtn.classList.remove("hidden");
+  togglePreviewBtn.textContent = "Show Preview";
+
+  setStatus("success", `${resp.sceneCount} scene(s) loaded. Enter filename to save.`);
+  checkSaveReady();
 }
 
 // ─── Events ───
-filenameManualInput.addEventListener("input", () => {
+
+function checkSaveReady() {
+  // Enable save only when we have parsed JSON data AND a filename
   if (latestExtraction && filenameManualInput.value.trim()) {
     saveButton.disabled = false;
-    filenameEl.textContent = filenameManualInput.value.trim();
-    const r = getSelectedResponse();
-    if (r) setStatus("success", `${r.sceneCount} scene(s) ready. Save when ready.`);
+  } else {
+    saveButton.disabled = true;
   }
-});
+}
 
 responseSelector.addEventListener("change", onResponseChange);
 tabScenesBtn.addEventListener("click", () => setActiveTab("scenes"));
 tabJsonBtn.addEventListener("click", () => setActiveTab("json"));
 copyPromptButton.addEventListener("click", copyPrompt);
 refreshButton.addEventListener("click", refreshExtraction);
+modeAutoBtn.addEventListener("click", () => {
+  togglePreviewBtn.classList.add("hidden");
+  setMode("auto");
+});
+modeManualBtn.addEventListener("click", () => {
+  togglePreviewBtn.classList.add("hidden");
+  setMode("manual");
+});
+
+togglePreviewBtn.addEventListener("click", () => {
+  if (previewSection.classList.contains("hidden")) {
+    previewSection.classList.remove("hidden");
+    togglePreviewBtn.textContent = "Hide Preview";
+  } else {
+    previewSection.classList.add("hidden");
+    togglePreviewBtn.textContent = "Show Preview";
+  }
+});
+
+pinPopupBtn.addEventListener("click", () => {
+  chrome.windows.create({
+    url: chrome.runtime.getURL("popup.html"),
+    type: "popup",
+    width: 480,
+    height: 600
+  });
+  window.close();
+});
+
+manualTextarea.addEventListener("input", () => {
+  if (manualTextarea.value.trim().length > 0) {
+    loadManualJson();
+  }
+});
 saveButton.addEventListener("click", saveImport);
 copyLogButton.addEventListener("click", async () => {
   try {
@@ -579,4 +866,63 @@ copyLogButton.addEventListener("click", async () => {
   } catch { copyLogButton.textContent = "Failed"; }
 });
 
-refreshExtraction();
+manualTextarea.addEventListener("contextmenu", async (e) => {
+  e.preventDefault();
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      manualTextarea.value = text;
+      loadManualJson();
+    }
+  } catch (err) {
+    if (err.name === 'NotAllowedError') {
+      setStatus("error", "Clipboard access denied. Please allow it or paste using Ctrl+V.");
+    } else {
+      setStatus("error", "Could not read clipboard. Please paste manually (Ctrl+V) and click Load.");
+    }
+  }
+});
+
+// Filename Input & Autocomplete Events (single merged handler)
+filenameManualInput.addEventListener("input", () => {
+  renderAutocomplete(filenameManualInput.value);
+  updateFilenameButtons();
+  checkSaveReady();
+  if (latestExtraction && filenameManualInput.value.trim()) {
+    const r = getSelectedResponse();
+    if (r) setStatus("success", `${r.sceneCount} scene(s) ready. Save when ready.`);
+  }
+});
+
+filenameManualInput.addEventListener("focus", () => {
+  renderAutocomplete(filenameManualInput.value);
+});
+
+// Hide dropdown when clicking ANYWHERE outside the input+dropdown+buttons zone
+document.addEventListener("mousedown", (e) => {
+  const wrapper = document.querySelector(".filename-wrapper");
+  if (wrapper && !wrapper.contains(e.target) && e.target !== filenameClearBtn && e.target !== videoPreviewBtn) {
+    autocompleteList.classList.add("hidden");
+  }
+});
+
+filenameClearBtn.addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  filenameManualInput.value = "";
+  hideVideoPreview();
+  updateFilenameButtons();
+  checkSaveReady();
+  // Re-show dropdown after clearing
+  filenameManualInput.focus();
+  renderAutocomplete("");
+});
+
+videoPreviewBtn.addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  toggleVideoPreview();
+});
+
+// Initialize extension with manual mode selected
+setMode("manual");

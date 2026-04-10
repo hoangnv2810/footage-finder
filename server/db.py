@@ -398,6 +398,20 @@ def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
 
     if hv:
         video_id = hv["id"]
+        # Check if the exact same scenes already exist in the latest version
+        last_version = conn.execute(
+            "SELECT id, scenes FROM video_version WHERE video_id = ? ORDER BY timestamp DESC LIMIT 1",
+            (video_id,)
+        ).fetchone()
+        
+        if last_version:
+            try:
+                last_scenes = json.loads(last_version["scenes"])
+                if last_scenes == scenes:
+                    conn.commit()
+                    return {"history": _get_history_item(history_id), "version_id": last_version["id"], "is_duplicate": True}
+            except Exception:
+                pass
     else:
         cur = conn.execute(
             """
@@ -428,7 +442,7 @@ def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
     )
 
     conn.commit()
-    return {"history": _get_history_item(history_id), "version_id": version_id}
+    return {"history": _get_history_item(history_id), "version_id": version_id, "is_duplicate": False}
 
 
 def get_version_scenes(version_id: str) -> list[dict] | None:
