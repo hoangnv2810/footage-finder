@@ -39,6 +39,7 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             history_id TEXT NOT NULL REFERENCES history(id) ON DELETE CASCADE,
             file_name TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'web',
             status TEXT NOT NULL DEFAULT 'pending',
             error TEXT,
             current_version_index INTEGER DEFAULT 0,
@@ -76,6 +77,18 @@ def init_db() -> None:
     if not _has_column(conn, "history_video", "current_search_keywords"):
         conn.execute(
             "ALTER TABLE history_video ADD COLUMN current_search_keywords TEXT NOT NULL DEFAULT ''"
+        )
+
+    if not _has_column(conn, "history_video", "source"):
+        conn.execute(
+            "ALTER TABLE history_video ADD COLUMN source TEXT NOT NULL DEFAULT 'web'"
+        )
+        conn.execute(
+            "UPDATE history_video SET source = 'extension' WHERE history_id LIKE ?",
+            (f"{IMPORT_HISTORY_PREFIX}%",),
+        )
+        conn.execute(
+            "UPDATE history_video SET source = 'web' WHERE source IS NULL OR source = ''"
         )
 
     conn.commit()
@@ -171,6 +184,7 @@ def _video_row_to_dict(
     return {
         "dbVideoId": row["id"],
         "fileName": row["file_name"],
+        "source": row["source"],
         "status": row["status"],
         "error": row["error"],
         "scenes": scenes,
@@ -245,12 +259,13 @@ def save_history(item: dict[str, Any]) -> dict:
             conn.execute(
                 """
                 UPDATE history_video
-                SET status = ?, error = ?, current_version_index = ?, current_search_keywords = ?
+                SET status = ?, error = ?, source = COALESCE(?, source), current_version_index = ?, current_search_keywords = ?
                 WHERE id = ?
                 """,
                 (
                     video.get("status", "pending"),
                     video.get("error"),
+                    video.get("source"),
                     video.get("currentVersionIndex", 0),
                     video.get("currentSearchKeywords", ""),
                     existing_video["id"],
@@ -260,12 +275,13 @@ def save_history(item: dict[str, Any]) -> dict:
             conn.execute(
                 """
                 INSERT INTO history_video (
-                    history_id, file_name, status, error, current_version_index, current_search_keywords
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    history_id, file_name, source, status, error, current_version_index, current_search_keywords
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item["id"],
                     video["fileName"],
+                    video.get("source", "web"),
                     video.get("status", "pending"),
                     video.get("error"),
                     video.get("currentVersionIndex", 0),
@@ -343,8 +359,8 @@ def save_analysis(
         cur = conn.execute(
             """
             INSERT INTO history_video (
-                history_id, file_name, status, current_version_index, current_search_keywords
-            ) VALUES (?, ?, 'success', 0, '')
+                history_id, file_name, source, status, current_version_index, current_search_keywords
+            ) VALUES (?, ?, 'web', 'success', 0, '')
             """,
             (history_id, filename),
         )
@@ -401,23 +417,27 @@ def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
         # Check if the exact same scenes already exist in the latest version
         last_version = conn.execute(
             "SELECT id, scenes FROM video_version WHERE video_id = ? ORDER BY timestamp DESC LIMIT 1",
-            (video_id,)
+            (video_id,),
         ).fetchone()
-        
+
         if last_version:
             try:
                 last_scenes = json.loads(last_version["scenes"])
                 if last_scenes == scenes:
                     conn.commit()
-                    return {"history": _get_history_item(history_id), "version_id": last_version["id"], "is_duplicate": True}
+                    return {
+                        "history": _get_history_item(history_id),
+                        "version_id": last_version["id"],
+                        "is_duplicate": True,
+                    }
             except Exception:
                 pass
     else:
         cur = conn.execute(
             """
             INSERT INTO history_video (
-                history_id, file_name, status, current_version_index, current_search_keywords
-            ) VALUES (?, ?, 'success', 0, '')
+                history_id, file_name, source, status, current_version_index, current_search_keywords
+            ) VALUES (?, ?, 'extension', 'success', 0, '')
             """,
             (history_id, filename),
         )
@@ -442,7 +462,11 @@ def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
     )
 
     conn.commit()
-    return {"history": _get_history_item(history_id), "version_id": version_id, "is_duplicate": False}
+    return {
+        "history": _get_history_item(history_id),
+        "version_id": version_id,
+        "is_duplicate": False,
+    }
 
 
 def get_version_scenes(version_id: str) -> list[dict] | None:
@@ -579,7 +603,7 @@ def save_analysis_error(
         conn.execute(
             """
             UPDATE history_video
-            SET status = 'error', error = ?, current_search_keywords = ''
+            SET status = 'error', error = ?, source = 'web', current_search_keywords = ''
             WHERE id = ?
             """,
             (error_msg, hv["id"]),
@@ -588,8 +612,8 @@ def save_analysis_error(
         conn.execute(
             """
             INSERT INTO history_video (
-                history_id, file_name, status, error, current_version_index, current_search_keywords
-            ) VALUES (?, ?, 'error', ?, 0, '')
+                history_id, file_name, source, status, error, current_version_index, current_search_keywords
+            ) VALUES (?, ?, 'web', 'error', ?, 0, '')
             """,
             (history_id, filename, error_msg),
         )
