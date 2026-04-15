@@ -22,6 +22,7 @@ type ViewMode = 'matched' | 'full';
 type AppMenu = 'library' | 'search' | 'storyboard';
 type DatasetSource = 'extension' | 'web';
 type DatasetSourceFilter = 'all' | DatasetSource;
+const LIBRARY_PLAYER_SLOT = -1;
 
 interface VideoVersion {
   id: string;
@@ -43,6 +44,8 @@ interface VideoResult {
   dbVideoId?: number;
   fileName: string;
   source: DatasetSource;
+  productNameOverride?: string;
+  resolvedProductName?: string;
   scenes: Scene[];
   status: 'pending' | 'analyzing' | 'success' | 'error';
   error?: string;
@@ -59,6 +62,7 @@ interface HistoryItem {
   id: string;
   date: number;
   keywords: string;
+  productName?: string;
   videos: VideoResult[];
 }
 
@@ -67,6 +71,7 @@ interface DatasetItem extends VideoResult {
   historyId: string;
   updatedAt: number;
   historyKeywords: string;
+  productName: string;
 }
 
 interface StoryboardBeat {
@@ -117,6 +122,42 @@ const api = {
 
   async deleteHistory(id: string): Promise<void> {
     await fetch(`/api/history/${id}`, { method: 'DELETE' });
+  },
+
+  async deleteDataset(datasetId: string): Promise<void> {
+    const res = await fetch(`/api/datasets/${datasetId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      throw new Error(payload?.detail || `Server lỗi: ${res.status}`);
+    }
+  },
+
+  async updateHistoryProductName(historyId: string, productName: string): Promise<HistoryItem> {
+    const res = await fetch(`/api/history/${historyId}/product`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_name: productName }),
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      throw new Error(payload?.detail || `Server lỗi: ${res.status}`);
+    }
+    const payload = await res.json();
+    return payload.history;
+  },
+
+  async updateDatasetProductName(datasetId: string, productNameOverride: string): Promise<HistoryItem> {
+    const res = await fetch(`/api/datasets/${datasetId}/product`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_name_override: productNameOverride }),
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      throw new Error(payload?.detail || `Server lỗi: ${res.status}`);
+    }
+    const payload = await res.json();
+    return payload.history;
   },
 
   async search(versionId: string, keywords: string): Promise<any> {
@@ -185,6 +226,8 @@ const getSourceBadgeClass = (source: DatasetSource) => source === 'extension'
   ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
   : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20';
 
+const FALLBACK_PRODUCT_NAME = 'Chưa gán sản phẩm';
+
 const normalizeVideo = (video: VideoResult): VideoResult => {
   const versions = video.versions || [];
   const currentVersionIndex = versions.length > 0
@@ -207,6 +250,8 @@ const normalizeVideo = (video: VideoResult): VideoResult => {
   return {
     ...video,
     source: video.source || 'web',
+    productNameOverride: video.productNameOverride || '',
+    resolvedProductName: video.resolvedProductName || FALLBACK_PRODUCT_NAME,
     scenes: viewMode === 'matched' ? matchedScenes : fullScenes,
     versions,
     currentVersionIndex,
@@ -232,6 +277,7 @@ const buildDatasetItems = (items: HistoryItem[]): DatasetItem[] => items.flatMap
     historyId: item.id,
     updatedAt: item.date,
     historyKeywords: item.keywords,
+    productName: video.resolvedProductName || item.productName || FALLBACK_PRODUCT_NAME,
   })),
 );
 
@@ -293,12 +339,14 @@ async function readSSEStream(
 export default function App() {
   const [activeMenu, setActiveMenu] = useState<AppMenu>('library');
   const [keywords, setKeywords] = useState('');
+  const [searchProductName, setSearchProductName] = useState('');
   const [videos, setVideos] = useState<VideoResult[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [currentSearchId, setCurrentSearchId] = useState<string | null>(null);
   const [activeDatasetId, setActiveDatasetId] = useState<string | null>(null);
+  const [expandedProductGroups, setExpandedProductGroups] = useState<string[]>([]);
   const [librarySourceFilter, setLibrarySourceFilter] = useState<DatasetSourceFilter>('all');
   const [trimmingScene, setTrimmingScene] = useState<string | null>(null);
   const [trimStatus, setTrimStatus] = useState<string>('');
@@ -323,6 +371,9 @@ export default function App() {
   const storyboardPlaybackRef = useRef<{ end: number } | null>(null);
   const storyboardPendingMatchRef = useRef<StoryboardMatch | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [libraryBatchProductName, setLibraryBatchProductName] = useState('');
+  const [libraryVideoProductName, setLibraryVideoProductName] = useState('');
+  const [libraryViewMode, setLibraryViewMode] = useState<ViewMode>('full');
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -341,6 +392,8 @@ export default function App() {
       const newVideos: VideoResult[] = (result.uploaded || []).map((u: any) => ({
         fileName: u.filename,
         source: 'web' as const,
+        productNameOverride: '',
+        resolvedProductName: searchProductName.trim() || FALLBACK_PRODUCT_NAME,
         scenes: [],
         status: 'pending' as const,
         searchResults: [],
@@ -364,7 +417,7 @@ export default function App() {
 
   const refreshHistory = useCallback(() => {
     api.history().then(items => setHistory(normalizeHistory(items))).catch(() => {});
-  }, []);
+  }, [searchProductName]);
 
   const upsertHistoryItem = useCallback((item: HistoryItem) => {
     const normalizedItem = normalizeHistoryItem(item);
@@ -378,6 +431,28 @@ export default function App() {
     const serverVideo = savedHistory?.videos?.find(v => v.fileName === filename);
     return serverVideo ? normalizeVideo({ ...serverVideo, status: 'success' }) : null;
   }, []);
+
+  const focusSavedVideo = useCallback((savedHistory: HistoryItem | null, filename: string): VideoResult | null => {
+    const serverVideo = getServerVideo(savedHistory, filename);
+    if (serverVideo?.dbVideoId !== undefined) {
+      setActiveDatasetId(String(serverVideo.dbVideoId));
+    }
+    return serverVideo;
+  }, [getServerVideo]);
+
+  const applyUpdatedHistory = useCallback((updatedHistory: HistoryItem, preferredDatasetId?: string) => {
+    upsertHistoryItem(updatedHistory);
+    if (preferredDatasetId) {
+      setActiveDatasetId(preferredDatasetId);
+      return;
+    }
+
+    const normalizedItem = normalizeHistoryItem(updatedHistory);
+    const firstVideoId = normalizedItem.videos[0]?.dbVideoId;
+    if (firstVideoId !== undefined) {
+      setActiveDatasetId(String(firstVideoId));
+    }
+  }, [upsertHistoryItem]);
 
   const persistVideoSelection = useCallback(async (historyId: string, filename: string, currentVersionIndex: number, currentSearchKeywords: string) => {
     const updatedHistory = await api.updateVideoSelection(historyId, filename, currentVersionIndex, currentSearchKeywords);
@@ -401,6 +476,23 @@ export default function App() {
     [datasetItems, librarySourceFilter],
   );
 
+  const groupedDatasets = useMemo(() => {
+    const groups = new Map<string, DatasetItem[]>();
+    filteredDatasets.forEach((dataset) => {
+      const key = dataset.productName || FALLBACK_PRODUCT_NAME;
+      const existing = groups.get(key) || [];
+      existing.push(dataset);
+      groups.set(key, existing);
+    });
+
+    return Array.from(groups.entries())
+      .map(([productName, datasets]) => ({
+        productName,
+        datasets: [...datasets].sort((a, b) => b.updatedAt - a.updatedAt),
+      }))
+      .sort((a, b) => a.productName.localeCompare(b.productName, 'vi'));
+  }, [filteredDatasets]);
+
   const activeDataset = useMemo(
     () => filteredDatasets.find(dataset => dataset.datasetId === activeDatasetId) || filteredDatasets[0] || null,
     [filteredDatasets, activeDatasetId],
@@ -421,6 +513,8 @@ export default function App() {
 
   const selectedStoryboardBeat = storyboardResult?.beats.find(beat => beat.id === selectedStoryboardBeatId) || null;
   const selectedStoryboardBeatMatches = storyboardResult?.beatMatches.find(match => match.beatId === selectedStoryboardBeatId)?.matches || [];
+  const activeDatasetStoryboardVersionId = activeDataset?.versions?.[activeDataset.currentVersionIndex || 0]?.id || null;
+  const activeDatasetUsableForStoryboard = !!activeDatasetStoryboardVersionId && storyboardSources.some(source => source.versionId === activeDatasetStoryboardVersionId);
 
   useEffect(() => {
     const availableIds = filteredDatasets.map(dataset => dataset.datasetId);
@@ -433,13 +527,49 @@ export default function App() {
   }, [filteredDatasets]);
 
   useEffect(() => {
+    const productNames = groupedDatasets.map(group => group.productName);
+    setExpandedProductGroups(prev => {
+      const kept = prev.filter(name => productNames.includes(name));
+      if (kept.length > 0) return kept;
+      return productNames.length > 0 ? [productNames[0]] : [];
+    });
+  }, [groupedDatasets]);
+
+  useEffect(() => {
+    if (!activeDataset?.productName) return;
+    setExpandedProductGroups(prev => prev.includes(activeDataset.productName)
+      ? prev
+      : [...prev, activeDataset.productName]);
+  }, [activeDataset?.productName]);
+
+  useEffect(() => {
+    if (!activeDataset) {
+      setLibraryBatchProductName('');
+      setLibraryVideoProductName('');
+      setLibraryViewMode('full');
+      return;
+    }
+
+    const sourceHistory = history.find(item => item.id === activeDataset.historyId);
+    setLibraryBatchProductName(sourceHistory?.productName || '');
+    setLibraryVideoProductName(activeDataset.productNameOverride || '');
+    setLibraryViewMode(activeDataset.currentSearchKeywords ? 'matched' : 'full');
+  }, [activeDataset, history]);
+
+  useEffect(() => {
+    const preferredVersionId = activeDatasetStoryboardVersionId;
     setStoryboardSelectedVersionIds(prev => {
       const availableIds = storyboardSources.map(source => source.versionId);
       if (availableIds.length === 0) return [];
       const filtered = prev.filter(id => availableIds.includes(id));
-      return filtered.length > 0 ? filtered : availableIds;
+      if (filtered.length > 0) return filtered;
+      if (preferredVersionId && availableIds.includes(preferredVersionId)) {
+        return [preferredVersionId];
+      }
+      if (activeDataset) return [];
+      return availableIds;
     });
-  }, [storyboardSources]);
+  }, [activeDataset, activeDatasetStoryboardVersionId, storyboardSources]);
 
   useEffect(() => {
     if (!storyboardResult || !selectedStoryboardBeatId) return;
@@ -620,7 +750,7 @@ export default function App() {
     const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename, keywords: searchKeywords, history_id: historyId }),
+      body: JSON.stringify({ filename, keywords: searchKeywords, history_id: historyId, product_name: searchProductName.trim() }),
     });
 
     if (!response.ok || !response.body) {
@@ -737,7 +867,7 @@ export default function App() {
         try {
           const { savedHistory } = await searchOnServer(versionId, searchKeywords);
           if (savedHistory) upsertHistoryItem(savedHistory);
-          const serverVideo = getServerVideo(savedHistory, filename);
+          const serverVideo = focusSavedVideo(savedHistory, filename);
           updatedVideos[i] = serverVideo || normalizeVideo({ ...video, status: 'success', currentSearchKeywords: searchKeywords, viewMode: 'matched' });
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Lỗi không xác định';
@@ -763,7 +893,7 @@ export default function App() {
         const { savedHistory, errorMsg } = await analyzeOnServer(filename, historyId, searchKeywords);
         if (savedHistory) {
           upsertHistoryItem(savedHistory);
-          const serverVideo = getServerVideo(savedHistory, filename);
+          const serverVideo = focusSavedVideo(savedHistory, filename);
           updatedVideos[i] = serverVideo || normalizeVideo({ ...updatedVideos[i], status: 'success' });
         } else if (errorMsg) {
           updatedVideos[i] = { ...updatedVideos[i], status: 'error', error: errorMsg };
@@ -803,7 +933,7 @@ export default function App() {
       setVideos(prev => {
         const next = [...prev];
         if (savedHistory) {
-          const serverVideo = getServerVideo(savedHistory, video.fileName);
+          const serverVideo = focusSavedVideo(savedHistory, video.fileName);
           if (serverVideo) {
             next[index] = serverVideo;
           } else {
@@ -925,6 +1055,7 @@ export default function App() {
 
   const startNewSearch = () => {
     setKeywords('');
+    setSearchProductName('');
     setVideos([]);
     setCurrentSearchId(null);
     setGlobalError(null);
@@ -940,6 +1071,7 @@ export default function App() {
 
   const openDatasetInSearch = (dataset: DatasetItem) => {
     setKeywords(dataset.currentSearchKeywords || dataset.historyKeywords || '');
+    setSearchProductName(dataset.productName === FALLBACK_PRODUCT_NAME ? '' : dataset.productName);
     setVideos([normalizeVideo({ ...dataset })]);
     setCurrentSearchId(dataset.historyId);
     setActiveDatasetId(dataset.datasetId);
@@ -969,6 +1101,76 @@ export default function App() {
     }
   };
 
+  const saveHistoryProductName = async () => {
+    if (!activeDataset) return;
+    try {
+      const updatedHistory = await api.updateHistoryProductName(activeDataset.historyId, libraryBatchProductName);
+      applyUpdatedHistory(updatedHistory, activeDataset.datasetId);
+      setGlobalError(null);
+    } catch (error) {
+      setGlobalError(error instanceof Error ? error.message : 'Không thể cập nhật tên sản phẩm mặc định.');
+    }
+  };
+
+  const saveDatasetProductName = async () => {
+    if (!activeDataset) return;
+    try {
+      const updatedHistory = await api.updateDatasetProductName(activeDataset.datasetId, libraryVideoProductName);
+      applyUpdatedHistory(updatedHistory, activeDataset.datasetId);
+      setGlobalError(null);
+    } catch (error) {
+      setGlobalError(error instanceof Error ? error.message : 'Không thể cập nhật tên sản phẩm cho video này.');
+    }
+  };
+
+  const toggleProductGroup = (productName: string) => {
+    setExpandedProductGroups(prev => prev.includes(productName)
+      ? prev.filter(name => name !== productName)
+      : [...prev, productName]);
+  };
+
+  const applyLibrarySearchSelection = async (dataset: DatasetItem, searchKeywords: string) => {
+    try {
+      await persistVideoSelection(dataset.historyId, dataset.fileName, dataset.currentVersionIndex || 0, searchKeywords);
+      setGlobalError(null);
+    } catch (error) {
+      setGlobalError(error instanceof Error ? error.message : 'Không thể chuyển kết quả tìm kiếm đang xem.');
+    }
+  };
+
+  const removeDataset = async (dataset: DatasetItem) => {
+    const confirmed = window.confirm(`Xóa dataset đã lưu cho video "${dataset.fileName}"?`);
+    if (!confirmed) return;
+
+    try {
+      const removedVersionIds = new Set((dataset.versions || []).map(version => version.id));
+      const remainingSearchVideos = videos.filter(video => String(video.dbVideoId) !== dataset.datasetId);
+
+      await api.deleteDataset(dataset.datasetId);
+      setHistory(prev => prev
+        .map(item => item.id === dataset.historyId
+          ? { ...item, videos: item.videos.filter(video => String(video.dbVideoId) !== dataset.datasetId) }
+          : item)
+        .filter(item => item.videos.length > 0));
+
+      setVideos(remainingSearchVideos);
+      if (currentSearchId === dataset.historyId && remainingSearchVideos.length === 0) {
+        setCurrentSearchId(null);
+        setKeywords('');
+      }
+      if (activeDatasetId === dataset.datasetId) {
+        setActiveDatasetId(null);
+      }
+      setStoryboardSelectedVersionIds(prev => prev.filter(id => !removedVersionIds.has(id)));
+      if (storyboardResult?.beatMatches.some(group => group.matches.some(match => removedVersionIds.has(match.videoVersionId)))) {
+        resetStoryboardState();
+      }
+      setGlobalError(null);
+    } catch (error) {
+      setGlobalError(error instanceof Error ? error.message : 'Không thể xóa dataset đã lưu.');
+    }
+  };
+
   // --- Helpers ---
 
   const formatTime = (seconds: number) => {
@@ -978,6 +1180,9 @@ export default function App() {
   };
 
   const activeDatasetVersion = activeDataset?.versions?.[activeDataset.currentVersionIndex || 0] || null;
+  const activeLibraryScenes = libraryViewMode === 'matched'
+    ? (activeDataset?.matchedScenes || [])
+    : (activeDatasetVersion?.scenes || []);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-indigo-500/30">
@@ -1057,11 +1262,14 @@ export default function App() {
             )}
 
             {activeMenu === 'library' ? (
-              <div className="grid grid-cols-1 xl:grid-cols-[340px,1fr] gap-6">
-                <div className="space-y-4">
-                  <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4">
-                    <p className="text-sm font-medium text-zinc-200 mb-3">Nguồn dữ liệu</p>
-                    <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-[380px_1fr] gap-6 items-start min-h-[calc(100vh-230px)]">
+                <section className="space-y-4 sticky top-8">
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-medium text-zinc-200">Nguồn dữ liệu</p>
+                      <span className="text-xs text-zinc-500">{filteredDatasets.length} dataset · {groupedDatasets.length} nhóm</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
                       {([
                         { key: 'all', label: 'Tất cả' },
                         { key: 'extension', label: 'Extension' },
@@ -1070,7 +1278,7 @@ export default function App() {
                         <button
                           key={filter.key}
                           onClick={() => setLibrarySourceFilter(filter.key)}
-                          className={`px-3 py-2 rounded-xl text-sm border transition-colors ${librarySourceFilter === filter.key ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-200' : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'}`}
+                          className={`rounded-xl border px-3 py-2 text-xs transition-colors ${librarySourceFilter === filter.key ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-200' : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'}`}
                         >
                           {filter.label}
                         </button>
@@ -1078,190 +1286,446 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-medium text-zinc-200">Dataset đã lưu</h3>
-                      <span className="text-xs text-zinc-500">{filteredDatasets.length}</span>
-                    </div>
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
 
-                    {filteredDatasets.length === 0 ? (
-                      <div className="min-h-[220px] flex items-center justify-center text-sm text-zinc-500 text-center border border-dashed border-zinc-800 rounded-xl px-4">
-                        {librarySourceFilter === 'all'
-                          ? 'Chưa có dữ liệu nào trong thư viện.'
-                          : `Chưa có dữ liệu nguồn ${librarySourceFilter === 'extension' ? 'Extension' : 'Web'}.`}
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar">
-                        {filteredDatasets.map((dataset) => {
-                          const isActive = activeDataset?.datasetId === dataset.datasetId;
-                          return (
-                            <button
-                              key={dataset.datasetId}
-                              onClick={() => setActiveDatasetId(dataset.datasetId)}
-                              className={`w-full text-left p-4 rounded-2xl border transition-colors ${isActive ? 'bg-indigo-500/10 border-indigo-500/30' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'}`}
-                            >
-                              <div className="flex items-start justify-between gap-3 mb-3">
-                                <p className="text-sm font-medium text-zinc-100 truncate">{dataset.fileName}</p>
-                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getSourceBadgeClass(dataset.source)}`}>
-                                  {getSourceLabel(dataset.source)}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-xs text-zinc-500">
-                                <span>{dataset.versions?.length || 0} version</span>
-                                <span>{new Date(dataset.updatedAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
-                              </div>
-                              {dataset.currentSearchKeywords && (
-                                <p className="text-xs text-zinc-400 mt-3 truncate">
-                                  Từ khóa hiện tại: <span className="text-zinc-200">{dataset.currentSearchKeywords}</span>
-                                </p>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-6">
-                  {activeDataset ? (
-                    <div className="space-y-6">
-                      <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2 mb-3">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getSourceBadgeClass(activeDataset.source)}`}>
-                              {getSourceLabel(activeDataset.source)}
-                            </span>
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-950 border border-zinc-800 text-zinc-400">
-                              {activeDataset.status}
-                            </span>
-                          </div>
-                          <h3 className="text-2xl font-semibold text-zinc-100 break-all">{activeDataset.fileName}</h3>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-500 mt-3">
-                            <span>{activeDataset.versions?.length || 0} version</span>
-                            <span>Cập nhật {new Date(activeDataset.updatedAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
-                          </div>
+                      {filteredDatasets.length === 0 ? (
+                        <div className="min-h-[220px] flex items-center justify-center rounded-xl border border-dashed border-zinc-800 px-4 text-center text-sm text-zinc-500">
+                          {librarySourceFilter === 'all'
+                            ? 'Chưa có dữ liệu nào trong thư viện.'
+                            : `Chưa có dữ liệu nguồn ${librarySourceFilter === 'extension' ? 'Extension' : 'Web'}.`}
                         </div>
+                      ) : (
+                        <div className="max-h-[72vh] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+                          {groupedDatasets.map((group) => {
+                            const isExpanded = expandedProductGroups.includes(group.productName);
+                            return (
+                              <div key={group.productName} className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/60">
+                                <button
+                                  onClick={() => toggleProductGroup(group.productName)}
+                                  className="w-full border-b border-zinc-800/80 p-4 text-left transition-colors hover:bg-zinc-900/60"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium text-zinc-100">{group.productName}</p>
+                                      <p className="mt-1 text-xs text-zinc-500">{group.datasets.length} video</p>
+                                    </div>
+                                    <span className="text-xs text-zinc-500">{isExpanded ? 'Thu gọn' : 'Mở'}</span>
+                                  </div>
+                                </button>
 
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => openDatasetInSearch(activeDataset)}
-                            className="px-4 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-200 hover:border-zinc-700 transition-colors"
-                          >
-                            Mở trong Tìm phân cảnh
-                          </button>
-                          <button
-                            onClick={() => openDatasetInStoryboard(activeDataset)}
-                            disabled={!activeDatasetVersion || activeDatasetVersion.scenes.length === 0}
-                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Dùng cho Storyboard
-                          </button>
-                        </div>
-                      </div>
-
-                      {activeDataset.versions && activeDataset.versions.length > 1 && (
-                        <div>
-                          <label className="block text-sm font-medium text-zinc-300 mb-2">Version đang chọn</label>
-                          <select
-                            value={activeDataset.currentVersionIndex || 0}
-                            onChange={(e) => switchLibraryVersion(activeDataset, parseInt(e.target.value, 10))}
-                            className="w-full bg-zinc-950 border border-zinc-800 text-sm text-zinc-300 rounded-xl px-3 py-3 focus:outline-none focus:border-indigo-500"
-                          >
-                            {activeDataset.versions.map((version, versionIndex) => (
-                              <option key={version.id} value={versionIndex}>
-                                Lần {versionIndex + 1} {version.keywords ? `- "${version.keywords.length > 20 ? `${version.keywords.slice(0, 20)}...` : version.keywords}"` : ''} ({new Date(version.timestamp).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      {activeDataset.currentSearchKeywords && (
-                        <div className="px-4 py-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-sm text-indigo-200">
-                          Từ khóa hiện tại: <span className="font-medium">{activeDataset.currentSearchKeywords}</span>
-                        </div>
-                      )}
-
-                      {activeDataset.searchError && (
-                        <div className="px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-sm text-rose-300">
-                          {activeDataset.searchError}
-                        </div>
-                      )}
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium text-zinc-200">Phân cảnh của version đang chọn</h4>
-                          <span className="text-xs text-zinc-500">{activeDatasetVersion?.scenes.length || 0} scene</span>
-                        </div>
-
-                        {!activeDatasetVersion || activeDatasetVersion.scenes.length === 0 ? (
-                          <div className="min-h-[180px] flex items-center justify-center text-sm text-zinc-500 border border-dashed border-zinc-800 rounded-xl px-4 text-center">
-                            Dataset này chưa có scene hợp lệ để hiển thị.
-                          </div>
-                        ) : (
-                          <div className="space-y-3 max-h-[58vh] overflow-y-auto pr-1 custom-scrollbar">
-                            {activeDatasetVersion.scenes.map((scene, sceneIndex) => (
-                              <div key={`${activeDataset.datasetId}-scene-${sceneIndex}`} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800">
-                                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                                    {scene.keyword}
-                                  </span>
-                                  <span className="text-xs text-zinc-500">{formatTime(scene.start)} - {formatTime(scene.end)}</span>
-                                </div>
-                                <p className="text-sm text-zinc-200 leading-relaxed">{scene.description}</p>
-                                {(scene.context || scene.mood || scene.shot_type) && (
-                                  <div className="flex flex-wrap gap-2 mt-3 text-xs text-zinc-500">
-                                    {scene.context && <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">{scene.context}</span>}
-                                    {scene.mood && <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">{scene.mood}</span>}
-                                    {scene.shot_type && <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">{scene.shot_type}</span>}
+                                {isExpanded && (
+                                  <div className="space-y-2 p-2">
+                                    {group.datasets.map((dataset) => {
+                                      const isActive = activeDataset?.datasetId === dataset.datasetId;
+                                      return (
+                                        <button
+                                          key={dataset.datasetId}
+                                          onClick={() => setActiveDatasetId(dataset.datasetId)}
+                                          className={`w-full rounded-xl border p-4 text-left transition-colors ${isActive ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'}`}
+                                        >
+                                          <div className="mb-3 flex items-start justify-between gap-3">
+                                            <p className="truncate text-sm font-medium text-zinc-100">{dataset.fileName}</p>
+                                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(dataset.source)}`}>
+                                              {getSourceLabel(dataset.source)}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center justify-between text-xs text-zinc-500">
+                                            <span>{dataset.versions?.length || 0} version</span>
+                                            <span>{new Date(dataset.updatedAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                          </div>
+                                          {dataset.status === 'error' && dataset.error && (
+                                            <p className="mt-3 line-clamp-2 text-xs text-rose-300">{dataset.error}</p>
+                                          )}
+                                          {dataset.currentSearchKeywords && (
+                                            <p className="mt-3 truncate text-xs text-zinc-400">
+                                              Từ khóa hiện tại: <span className="text-zinc-200">{dataset.currentSearchKeywords}</span>
+                                            </p>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                  </div>
+                </section>
 
-                      {activeDataset.currentSearchKeywords && (
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-zinc-200">Kết quả tìm kiếm đang lưu</h4>
-                            <span className="text-xs text-zinc-500">{activeDataset.matchedScenes?.length || 0} scene</span>
+                    <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
+                      {activeDataset ? (
+                        <div className="space-y-5">
+                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div className="min-w-0">
+                              <div className="mb-3 flex flex-wrap items-center gap-2">
+                                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(activeDataset.source)}`}>
+                                  {getSourceLabel(activeDataset.source)}
+                                </span>
+                                <span className="inline-flex items-center rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs font-medium text-zinc-400">
+                                  {activeDataset.status}
+                                </span>
+                                <span className="inline-flex items-center rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs font-medium text-zinc-400">
+                                  {activeDataset.productName}
+                                </span>
+                              </div>
+                              <h4 className="break-all text-2xl font-semibold text-zinc-100">{activeDataset.fileName}</h4>
+                              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-zinc-500">
+                                <span>{activeDataset.versions?.length || 0} version</span>
+                                <span>Cập nhật {new Date(activeDataset.updatedAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => openDatasetInSearch(activeDataset)}
+                                className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2 text-zinc-200 transition-colors hover:border-zinc-700"
+                              >
+                                Mở trong Tìm phân cảnh
+                              </button>
+                              <button
+                                onClick={() => openDatasetInStoryboard(activeDataset)}
+                                disabled={!activeDatasetVersion || activeDatasetVersion.scenes.length === 0}
+                                className="rounded-xl bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Dùng cho Storyboard
+                              </button>
+                              <button
+                                onClick={() => removeDataset(activeDataset)}
+                                className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2 text-rose-300 transition-colors hover:bg-rose-500/20"
+                              >
+                                Xóa dataset
+                              </button>
+                            </div>
                           </div>
 
-                          {activeDataset.searchError ? null : (activeDataset.matchedScenes && activeDataset.matchedScenes.length > 0 ? (
-                            <div className="space-y-3">
-                              {activeDataset.matchedScenes.map((scene, sceneIndex) => (
-                                <div key={`${activeDataset.datasetId}-matched-${sceneIndex}`} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800">
-                                  <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                                      {scene.keyword}
-                                    </span>
-                                    <span className="text-xs text-zinc-500">{formatTime(scene.start)} - {formatTime(scene.end)}</span>
+                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-zinc-300">Tên sản phẩm mặc định của nhóm</label>
+                                <input
+                                  value={libraryBatchProductName}
+                                  onChange={(e) => setLibraryBatchProductName(e.target.value)}
+                                  placeholder="VD: Serum trị mụn"
+                                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none"
+                                />
+                              </div>
+                              <button
+                                onClick={saveHistoryProductName}
+                                className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-zinc-200 transition-colors hover:border-zinc-700"
+                              >
+                                Lưu tên mặc định cho nhóm
+                              </button>
+                            </div>
+
+                            <div className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                              <div>
+                                <label className="mb-2 block text-sm font-medium text-zinc-300">Tên sản phẩm riêng cho video đang chọn</label>
+                                <input
+                                  value={libraryVideoProductName}
+                                  onChange={(e) => setLibraryVideoProductName(e.target.value)}
+                                  placeholder="Để trống để dùng tên mặc định của nhóm"
+                                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none"
+                                />
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  onClick={saveDatasetProductName}
+                                  className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-zinc-200 transition-colors hover:border-zinc-700"
+                                >
+                                  Lưu cho video này
+                                </button>
+                                <button
+                                  onClick={() => setLibraryVideoProductName('')}
+                                  className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+                                >
+                                  Bỏ override
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/30"
+                          >
+                            <div className="flex flex-col gap-4 border-b border-zinc-800 bg-zinc-900/50 p-4 lg:flex-row lg:items-center lg:justify-between">
+                              <div className="min-w-0">
+                                <h3 className="truncate pr-4 font-medium text-zinc-200">
+                                  {activeDataset.fileName}
+                                </h3>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(activeDataset.source)}`}>
+                                    {getSourceLabel(activeDataset.source)}
+                                  </span>
+                                  <span className="inline-flex items-center rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs font-medium text-zinc-400">
+                                    {activeDataset.productName}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                {activeDataset.versions && activeDataset.versions.length > 1 && (
+                                  <select
+                                    value={activeDataset.currentVersionIndex || 0}
+                                    onChange={(e) => switchLibraryVersion(activeDataset, parseInt(e.target.value, 10))}
+                                    className="rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-300 focus:border-indigo-500 focus:outline-none"
+                                  >
+                                    {activeDataset.versions.map((version, versionIndex) => (
+                                      <option key={version.id} value={versionIndex}>
+                                        Lần {versionIndex + 1} {version.keywords ? `- "${version.keywords.length > 20 ? `${version.keywords.slice(0, 20)}...` : version.keywords}"` : ''} ({new Date(version.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                {activeDataset.currentSearchKeywords && (
+                                  <div className="inline-flex items-center rounded-full border border-zinc-800 bg-zinc-950 p-0.5">
+                                    <button
+                                      onClick={() => setLibraryViewMode('matched')}
+                                      disabled={!activeDataset.currentSearchKeywords}
+                                      className={`rounded-full px-2.5 py-1 text-xs transition-colors ${libraryViewMode === 'matched' ? 'bg-indigo-500 text-white' : 'text-zinc-400 hover:text-zinc-200'} disabled:opacity-40`}
+                                    >
+                                      Kết quả tìm kiếm
+                                    </button>
+                                    <button
+                                      onClick={() => setLibraryViewMode('full')}
+                                      className={`rounded-full px-2.5 py-1 text-xs transition-colors ${libraryViewMode === 'full' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                    >
+                                      Toàn bộ phân tích
+                                    </button>
                                   </div>
-                                  <p className="text-sm text-zinc-200 leading-relaxed">{scene.description}</p>
+                                )}
+
+                                {activeLibraryScenes.length > 0 && (
+                                  <button
+                                    onClick={() => exportSRT({ ...activeDataset, scenes: activeLibraryScenes })}
+                                    className="inline-flex items-center rounded-full bg-indigo-400/10 px-3 py-1.5 text-xs text-indigo-400 transition-colors hover:bg-indigo-400/20"
+                                    title="Xuất SRT cho CapCut"
+                                  >
+                                    <FileText className="mr-1.5 h-3 w-3" />
+                                    Xuất SRT
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 divide-y divide-zinc-800 md:grid-cols-2 md:divide-x md:divide-y-0">
+                              <div className="flex flex-col justify-center bg-black/20 p-4">
+                                <video
+                                  id="video-player-library"
+                                  ref={(node) => {
+                                    playerRefs.current[LIBRARY_PLAYER_SLOT] = node;
+                                  }}
+                                  src={`/api/videos/${encodeURIComponent(activeDataset.fileName)}/stream`}
+                                  preload="metadata"
+                                  onLoadedMetadata={() => handlePlayerLoadedMetadata(LIBRARY_PLAYER_SLOT)}
+                                  onTimeUpdate={() => handlePlayerTimeUpdate(LIBRARY_PLAYER_SLOT)}
+                                  controls
+                                  className="max-h-[60vh] w-full rounded-lg bg-black object-contain"
+                                />
+                              </div>
+
+                              <div className="h-full max-h-[60vh] overflow-y-auto p-4 custom-scrollbar">
+                                {activeDataset.currentSearchKeywords && (
+                                  <div className="mb-3 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-300">
+                                    Từ khóa hiện tại: <span className="font-medium">{activeDataset.currentSearchKeywords}</span>
+                                  </div>
+                                )}
+
+                                {activeDataset.status === 'error' && (
+                                  <div className="flex h-full flex-col items-center justify-center p-4 text-center text-sm text-rose-400/80">
+                                    <AlertCircle className="mb-2 h-6 w-6 opacity-50" />
+                                    <p>{activeDataset.error || 'Dataset đang ở trạng thái lỗi.'}</p>
+                                  </div>
+                                )}
+
+                                {activeDataset.status !== 'error' && activeDataset.searchError && libraryViewMode === 'matched' && (
+                                  <div className="mb-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+                                    {activeDataset.searchError}
+                                  </div>
+                                )}
+
+                                {activeDataset.status !== 'error' && activeLibraryScenes.length === 0 ? (
+                                  <div className="flex min-h-[120px] items-center justify-center text-center text-sm text-zinc-500">
+                                    {libraryViewMode === 'matched'
+                                      ? (activeDataset.searchError
+                                        ? 'Không thể tìm theo từ khóa hiện tại. Bạn vẫn có thể chuyển sang toàn bộ phân tích.'
+                                        : 'Không có phân cảnh nào khớp với từ khóa hiện tại.')
+                                      : 'Dataset này chưa có scene hợp lệ để hiển thị.'}
+                                  </div>
+                                ) : activeDataset.status !== 'error' && (
+                                  <div className="space-y-3">
+                                    {activeLibraryScenes.map((scene, sceneIndex) => {
+                                      const isTrimming = trimmingScene === `${activeDataset.fileName}-${sceneIndex}`;
+                                      return (
+                                        <div
+                                          key={`${activeDataset.datasetId}-${libraryViewMode}-${sceneIndex}`}
+                                          onClick={() => playScene(LIBRARY_PLAYER_SLOT, scene)}
+                                          onKeyDown={(event) => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                              event.preventDefault();
+                                              playScene(LIBRARY_PLAYER_SLOT, scene);
+                                            }
+                                          }}
+                                          role="button"
+                                          tabIndex={0}
+                                          className="group cursor-pointer rounded-xl border border-zinc-800 bg-zinc-950 p-3 transition-colors hover:border-indigo-500/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                                        >
+                                          <div className="mb-2 flex items-start justify-between">
+                                            <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium ${libraryViewMode === 'matched' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-indigo-500/20 bg-indigo-500/10 text-indigo-400'}`}>
+                                              {scene.keyword}
+                                            </span>
+                                            <button
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                playScene(LIBRARY_PLAYER_SLOT, scene);
+                                              }}
+                                              className="flex items-center text-xs text-zinc-400 transition-colors hover:text-indigo-400"
+                                              title="Phát từ đây"
+                                            >
+                                              <Play className="mr-1 h-3 w-3" />
+                                              {formatTime(scene.start)} - {formatTime(scene.end)}
+                                            </button>
+                                          </div>
+                                          <p className="mb-3 text-sm leading-relaxed text-zinc-300">{scene.description}</p>
+                                          <div className="flex items-center justify-end border-t border-zinc-800/50 pt-2">
+                                            <button
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                trimAndDownload(activeDataset, scene, sceneIndex);
+                                              }}
+                                              disabled={isTrimming}
+                                              className="flex items-center rounded-lg bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                              {isTrimming ? (
+                                                <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                                              ) : (
+                                                <Scissors className="mr-1.5 h-3 w-3" />
+                                              )}
+                                              {isTrimming ? (trimStatus || 'Đang cắt...') : 'Cắt & Tải xuống'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+
+                          {activeDataset.currentSearchKeywords && (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium text-zinc-200">Kết quả tìm kiếm đang lưu</h4>
+                                <span className="text-xs text-zinc-500">{activeDataset.matchedScenes?.length || 0} scene</span>
+                              </div>
+
+                              {activeDataset.searchError ? null : (activeDataset.matchedScenes && activeDataset.matchedScenes.length > 0 ? (
+                                <div className="space-y-3">
+                                  {activeDataset.matchedScenes.map((scene, sceneIndex) => (
+                                    <div key={`${activeDataset.datasetId}-matched-${sceneIndex}`} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                                        <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
+                                          {scene.keyword}
+                                        </span>
+                                        <span className="text-xs text-zinc-500">{formatTime(scene.start)} - {formatTime(scene.end)}</span>
+                                      </div>
+                                      <p className="text-sm leading-relaxed text-zinc-200">{scene.description}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-zinc-800 px-4 text-center text-sm text-zinc-500">
+                                  Không có scene nào khớp với từ khóa đang lưu.
                                 </div>
                               ))}
                             </div>
-                          ) : (
-                            <div className="min-h-[120px] flex items-center justify-center text-sm text-zinc-500 border border-dashed border-zinc-800 rounded-xl px-4 text-center">
-                              Không có scene nào khớp với từ khóa đang lưu.
+                          )}
+
+                          {activeDataset.searchResults && activeDataset.searchResults.length > 0 && (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium text-zinc-200">Các lượt tìm kiếm đã lưu</h4>
+                                <button
+                                  onClick={() => applyLibrarySearchSelection(activeDataset, '')}
+                                  className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-700"
+                                >
+                                  Xem toàn bộ phân tích
+                                </button>
+                              </div>
+
+                              <div className="space-y-3">
+                                {[...activeDataset.searchResults].sort((a, b) => b.timestamp - a.timestamp).map((result) => {
+                                  const isActiveResult = activeDataset.currentSearchKeywords === result.keywords;
+                                  return (
+                                    <div key={result.id} className={`rounded-xl border p-4 ${isActiveResult ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-zinc-800 bg-zinc-950'}`}>
+                                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                        <div className="min-w-0">
+                                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                                            <span className="inline-flex items-center rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-300">
+                                              {result.keywords || 'Phân tích toàn bộ'}
+                                            </span>
+                                            <span className="text-xs text-zinc-500">
+                                              {result.scenes.length} scene • {new Date(result.timestamp).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}
+                                            </span>
+                                          </div>
+                                          {result.error ? (
+                                            <p className="text-sm text-rose-300">{result.error}</p>
+                                          ) : (
+                                            <p className="text-sm text-zinc-400">
+                                              {result.scenes.length > 0
+                                                ? result.scenes[0]?.description || 'Đã lưu kết quả tìm kiếm.'
+                                                : 'Không có scene nào khớp trong lượt tìm kiếm này.'}
+                                            </p>
+                                          )}
+                                        </div>
+
+                                        <button
+                                          onClick={() => applyLibrarySearchSelection(activeDataset, result.keywords)}
+                                          className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-zinc-200 transition-colors hover:border-zinc-700"
+                                        >
+                                          {isActiveResult ? 'Đang áp dụng' : 'Áp dụng'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          ))}
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex min-h-[60vh] flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 px-6 text-center">
+                          <Film className="mb-4 h-10 w-10 text-zinc-700" />
+                          <p className="text-sm font-medium text-zinc-400">Hiển thị chi tiết video, phân cảnh</p>
+                          <p className="mt-2 max-w-xs text-xs text-zinc-600">Chọn một dataset ở cột bên trái để xem version và dữ liệu phân cảnh đã lưu.</p>
                         </div>
                       )}
-                    </div>
-                  ) : (
-                    <div className="min-h-[420px] flex items-center justify-center text-sm text-zinc-500 border border-dashed border-zinc-800 rounded-2xl px-6 text-center">
-                      Chọn một dataset bên trái để xem version và dữ liệu phân cảnh đã lưu.
-                    </div>
-                  )}
-                </div>
+                    </section>
               </div>
             ) : activeMenu === 'search' ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1 space-y-6">
+                  <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur-sm">
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">
+                      Tên sản phẩm cho phiên này
+                    </label>
+                    <input
+                      value={searchProductName}
+                      onChange={(e) => setSearchProductName(e.target.value)}
+                      placeholder="VD: Serum trị mụn, Khóa học tiếng Anh..."
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+                      disabled={isAnalyzing}
+                    />
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Dùng làm tên sản phẩm mặc định cho batch analyze này. Sau đó mày vẫn có thể override từng video trong thư viện.
+                    </p>
+                  </div>
+
                   <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 backdrop-blur-sm">
                     <label className="block text-sm font-medium text-zinc-300 mb-2">
                       Từ khóa tìm kiếm
@@ -1326,9 +1790,14 @@ export default function App() {
                                 </div>
                                 <div className="min-w-0">
                                   <span className="text-sm text-zinc-300 truncate block">{video.fileName}</span>
-                                  <span className={`inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${getSourceBadgeClass(video.source)}`}>
-                                    {getSourceLabel(video.source)}
-                                  </span>
+                                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${getSourceBadgeClass(video.source)}`}>
+                                      {getSourceLabel(video.source)}
+                                    </span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border bg-zinc-900 border-zinc-800 text-zinc-400">
+                                      {video.resolvedProductName || searchProductName || FALLBACK_PRODUCT_NAME}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                               <button
@@ -1369,6 +1838,14 @@ export default function App() {
                     <div className="h-full min-h-[400px] flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-500 text-center px-6">
                       <Film className="w-12 h-12 mb-4 opacity-20" />
                       <p>Tải video lên hoặc mở một dataset từ thư viện để bắt đầu tìm phân cảnh.</p>
+                      {activeDataset && (
+                        <button
+                          onClick={() => openDatasetInSearch(activeDataset)}
+                          className="mt-4 px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 hover:border-zinc-700 transition-colors"
+                        >
+                          Dùng dataset đang chọn: {activeDataset.fileName}
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-8">
@@ -1676,6 +2153,12 @@ export default function App() {
                         Chọn tất cả
                       </button>
                     </div>
+
+                    {activeDataset && !activeDatasetUsableForStoryboard && (
+                      <div className="mb-4 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-200">
+                        Dataset đang chọn chưa có version usable cho storyboard. Mày vẫn có thể chọn dataset khác bên dưới.
+                      </div>
+                    )}
 
                     {storyboardSources.length === 0 ? (
                       <p className="text-sm text-zinc-500">Chưa có dataset nào có scene hợp lệ để tạo storyboard.</p>

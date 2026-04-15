@@ -32,7 +32,8 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS history (
             id TEXT PRIMARY KEY,
             date INTEGER NOT NULL,
-            keywords TEXT NOT NULL
+            keywords TEXT NOT NULL,
+            product_name TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS history_video (
@@ -40,6 +41,7 @@ def init_db() -> None:
             history_id TEXT NOT NULL REFERENCES history(id) ON DELETE CASCADE,
             file_name TEXT NOT NULL,
             source TEXT NOT NULL DEFAULT 'web',
+            product_name_override TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'pending',
             error TEXT,
             current_version_index INTEGER DEFAULT 0,
@@ -89,6 +91,16 @@ def init_db() -> None:
         )
         conn.execute(
             "UPDATE history_video SET source = 'web' WHERE source IS NULL OR source = ''"
+        )
+
+    if not _has_column(conn, "history", "product_name"):
+        conn.execute(
+            "ALTER TABLE history ADD COLUMN product_name TEXT NOT NULL DEFAULT ''"
+        )
+
+    if not _has_column(conn, "history_video", "product_name_override"):
+        conn.execute(
+            "ALTER TABLE history_video ADD COLUMN product_name_override TEXT NOT NULL DEFAULT ''"
         )
 
     conn.commit()
@@ -162,8 +174,15 @@ def _active_search_result(
     return None
 
 
+def _resolve_product_name(history_product_name: str, video_override: str) -> str:
+    return (video_override or history_product_name or "").strip() or "Chưa gán sản phẩm"
+
+
 def _video_row_to_dict(
-    row: sqlite3.Row, versions: list[dict], search_results: list[dict]
+    row: sqlite3.Row,
+    versions: list[dict],
+    search_results: list[dict],
+    history_product_name: str,
 ) -> dict:
     if versions:
         current_version_index = min(
@@ -185,6 +204,10 @@ def _video_row_to_dict(
         "dbVideoId": row["id"],
         "fileName": row["file_name"],
         "source": row["source"],
+        "productNameOverride": row["product_name_override"] or "",
+        "resolvedProductName": _resolve_product_name(
+            history_product_name, row["product_name_override"] or ""
+        ),
         "status": row["status"],
         "error": row["error"],
         "scenes": scenes,
@@ -205,9 +228,13 @@ def _history_item_from_row(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
         "id": row["id"],
         "date": row["date"],
         "keywords": row["keywords"],
+        "productName": row["product_name"] or "",
         "videos": [
             _video_row_to_dict(
-                v, _load_versions(conn, v["id"]), _load_search_results(conn, v["id"])
+                v,
+                _load_versions(conn, v["id"]),
+                _load_search_results(conn, v["id"]),
+                row["product_name"] or "",
             )
             for v in videos
         ],
@@ -240,13 +267,23 @@ def save_history(item: dict[str, Any]) -> dict:
 
     if existing:
         conn.execute(
-            "UPDATE history SET date = ?, keywords = ? WHERE id = ?",
-            (item["date"], item.get("keywords", ""), item["id"]),
+            "UPDATE history SET date = ?, keywords = ?, product_name = COALESCE(?, product_name) WHERE id = ?",
+            (
+                item["date"],
+                item.get("keywords", ""),
+                item.get("productName") or None,
+                item["id"],
+            ),
         )
     else:
         conn.execute(
-            "INSERT INTO history (id, date, keywords) VALUES (?, ?, ?)",
-            (item["id"], item["date"], item.get("keywords", "")),
+            "INSERT INTO history (id, date, keywords, product_name) VALUES (?, ?, ?, ?)",
+            (
+                item["id"],
+                item["date"],
+                item.get("keywords", ""),
+                item.get("productName", ""),
+            ),
         )
 
     for video in item.get("videos", []):
@@ -259,13 +296,14 @@ def save_history(item: dict[str, Any]) -> dict:
             conn.execute(
                 """
                 UPDATE history_video
-                SET status = ?, error = ?, source = COALESCE(?, source), current_version_index = ?, current_search_keywords = ?
+                SET status = ?, error = ?, source = COALESCE(?, source), product_name_override = COALESCE(?, product_name_override), current_version_index = ?, current_search_keywords = ?
                 WHERE id = ?
                 """,
                 (
                     video.get("status", "pending"),
                     video.get("error"),
                     video.get("source"),
+                    video.get("productNameOverride") or None,
                     video.get("currentVersionIndex", 0),
                     video.get("currentSearchKeywords", ""),
                     existing_video["id"],
@@ -275,13 +313,14 @@ def save_history(item: dict[str, Any]) -> dict:
             conn.execute(
                 """
                 INSERT INTO history_video (
-                    history_id, file_name, source, status, error, current_version_index, current_search_keywords
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    history_id, file_name, source, product_name_override, status, error, current_version_index, current_search_keywords
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item["id"],
                     video["fileName"],
                     video.get("source", "web"),
+                    video.get("productNameOverride", ""),
                     video.get("status", "pending"),
                     video.get("error"),
                     video.get("currentVersionIndex", 0),
@@ -325,11 +364,39 @@ def delete_history(history_id: str) -> bool:
     return cur.rowcount > 0
 
 
+def delete_dataset(db_video_id: int) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT id, history_id FROM history_video WHERE id = ?", (db_video_id,)
+    ).fetchone()
+    if not row:
+        return None
+
+    history_id = row["history_id"]
+    conn.execute("DELETE FROM history_video WHERE id = ?", (db_video_id,))
+
+    remaining = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM history_video WHERE history_id = ?", (history_id,)
+    ).fetchone()["cnt"]
+
+    deleted_history = False
+    if remaining == 0:
+        conn.execute("DELETE FROM history WHERE id = ?", (history_id,))
+        deleted_history = True
+
+    conn.commit()
+    return {
+        "historyId": history_id,
+        "deletedHistory": deleted_history,
+    }
+
+
 def save_analysis(
     history_id: str,
     filename: str,
     keywords: str,
     scenes: list[dict],
+    product_name: str = "",
 ) -> dict:
     conn = _get_conn()
     now = int(time.time() * 1000)
@@ -339,13 +406,13 @@ def save_analysis(
     ).fetchone()
     if not existing:
         conn.execute(
-            "INSERT INTO history (id, date, keywords) VALUES (?, ?, ?)",
-            (history_id, now, keywords),
+            "INSERT INTO history (id, date, keywords, product_name) VALUES (?, ?, ?, ?)",
+            (history_id, now, keywords, product_name.strip()),
         )
     else:
         conn.execute(
-            "UPDATE history SET date = ?, keywords = ? WHERE id = ?",
-            (now, keywords, history_id),
+            "UPDATE history SET date = ?, keywords = ?, product_name = CASE WHEN ? != '' THEN ? ELSE product_name END WHERE id = ?",
+            (now, keywords, product_name.strip(), product_name.strip(), history_id),
         )
 
     hv = conn.execute(
@@ -359,8 +426,8 @@ def save_analysis(
         cur = conn.execute(
             """
             INSERT INTO history_video (
-                history_id, file_name, source, status, current_version_index, current_search_keywords
-            ) VALUES (?, ?, 'web', 'success', 0, '')
+                history_id, file_name, source, product_name_override, status, current_version_index, current_search_keywords
+            ) VALUES (?, ?, 'web', '', 'success', 0, '')
             """,
             (history_id, filename),
         )
@@ -388,7 +455,9 @@ def save_analysis(
     return {"history": _get_history_item(history_id), "version_id": version_id}
 
 
-def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
+def save_import_analysis(
+    filename: str, scenes: list[dict], product_name: str = ""
+) -> dict:
     conn = _get_conn()
     now = int(time.time() * 1000)
     history_id = _import_history_id(filename)
@@ -398,13 +467,13 @@ def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
     ).fetchone()
     if existing_history:
         conn.execute(
-            "UPDATE history SET date = ?, keywords = '' WHERE id = ?",
-            (now, history_id),
+            "UPDATE history SET date = ?, keywords = '', product_name = CASE WHEN product_name = '' AND ? != '' THEN ? ELSE product_name END WHERE id = ?",
+            (now, product_name.strip(), product_name.strip(), history_id),
         )
     else:
         conn.execute(
-            "INSERT INTO history (id, date, keywords) VALUES (?, ?, '')",
-            (history_id, now),
+            "INSERT INTO history (id, date, keywords, product_name) VALUES (?, ?, '', ?)",
+            (history_id, now, product_name.strip()),
         )
 
     hv = conn.execute(
@@ -424,6 +493,11 @@ def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
             try:
                 last_scenes = json.loads(last_version["scenes"])
                 if last_scenes == scenes:
+                    if product_name.strip():
+                        conn.execute(
+                            "UPDATE history SET product_name = CASE WHEN product_name = '' THEN ? ELSE product_name END WHERE id = ?",
+                            (product_name.strip(), history_id),
+                        )
                     conn.commit()
                     return {
                         "history": _get_history_item(history_id),
@@ -436,8 +510,8 @@ def save_import_analysis(filename: str, scenes: list[dict]) -> dict:
         cur = conn.execute(
             """
             INSERT INTO history_video (
-                history_id, file_name, source, status, current_version_index, current_search_keywords
-            ) VALUES (?, ?, 'extension', 'success', 0, '')
+                history_id, file_name, source, product_name_override, status, current_version_index, current_search_keywords
+            ) VALUES (?, ?, 'extension', '', 'success', 0, '')
             """,
             (history_id, filename),
         )
@@ -575,7 +649,11 @@ def save_search_result(
 
 
 def save_analysis_error(
-    history_id: str, filename: str, keywords: str, error_msg: str
+    history_id: str,
+    filename: str,
+    keywords: str,
+    error_msg: str,
+    product_name: str = "",
 ) -> None:
     conn = _get_conn()
     now = int(time.time() * 1000)
@@ -585,13 +663,13 @@ def save_analysis_error(
     ).fetchone()
     if not existing:
         conn.execute(
-            "INSERT INTO history (id, date, keywords) VALUES (?, ?, ?)",
-            (history_id, now, keywords),
+            "INSERT INTO history (id, date, keywords, product_name) VALUES (?, ?, ?, ?)",
+            (history_id, now, keywords, product_name.strip()),
         )
     else:
         conn.execute(
-            "UPDATE history SET date = ?, keywords = ? WHERE id = ?",
-            (now, keywords, history_id),
+            "UPDATE history SET date = ?, keywords = ?, product_name = CASE WHEN ? != '' THEN ? ELSE product_name END WHERE id = ?",
+            (now, keywords, product_name.strip(), product_name.strip(), history_id),
         )
 
     hv = conn.execute(
@@ -612,10 +690,44 @@ def save_analysis_error(
         conn.execute(
             """
             INSERT INTO history_video (
-                history_id, file_name, source, status, error, current_version_index, current_search_keywords
-            ) VALUES (?, ?, 'web', 'error', ?, 0, '')
+                history_id, file_name, source, product_name_override, status, error, current_version_index, current_search_keywords
+            ) VALUES (?, ?, 'web', '', 'error', ?, 0, '')
             """,
             (history_id, filename, error_msg),
         )
 
     conn.commit()
+
+
+def update_history_product_name(history_id: str, product_name: str) -> dict | None:
+    conn = _get_conn()
+    cur = conn.execute(
+        "UPDATE history SET product_name = ?, date = ? WHERE id = ?",
+        (product_name.strip(), int(time.time() * 1000), history_id),
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        return None
+    return _get_history_item(history_id)
+
+
+def update_dataset_product_name(
+    db_video_id: int, product_name_override: str
+) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT history_id FROM history_video WHERE id = ?", (db_video_id,)
+    ).fetchone()
+    if not row:
+        return None
+
+    conn.execute(
+        "UPDATE history_video SET product_name_override = ? WHERE id = ?",
+        (product_name_override.strip(), db_video_id),
+    )
+    conn.execute(
+        "UPDATE history SET date = ? WHERE id = ?",
+        (int(time.time() * 1000), row["history_id"]),
+    )
+    conn.commit()
+    return _get_history_item(row["history_id"])

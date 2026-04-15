@@ -24,6 +24,7 @@ from analysis import (
     validate_import_scenes,
 )
 from db import (
+    delete_dataset,
     delete_history,
     get_version_scenes,
     get_video_versions_for_storyboard,
@@ -35,6 +36,8 @@ from db import (
     save_import_analysis,
     save_search_result,
     save_video_file,
+    update_dataset_product_name,
+    update_history_product_name,
     update_video_selection,
 )
 from sse import sse_event
@@ -169,6 +172,7 @@ class AnalyzeRequest(BaseModel):
     filename: str
     keywords: str = ""
     history_id: str | None = None
+    product_name: str = ""
 
 
 class SearchRequest(BaseModel):
@@ -180,6 +184,7 @@ class ImportAnalysisRequest(BaseModel):
     filename: str
     scenes: list[dict[str, Any]]
     source: str = "chat.qwen.ai"
+    product_name: str = ""
 
 
 class SelectionPayload(BaseModel):
@@ -197,6 +202,14 @@ class StoryboardRequest(BaseModel):
     key_benefits: str = ""
     script_text: str
     selected_version_ids: list[str]
+
+
+class HistoryProductPayload(BaseModel):
+    product_name: str = ""
+
+
+class DatasetProductPayload(BaseModel):
+    product_name_override: str = ""
 
 
 def _parse_sse_event(event: str) -> tuple[str | None, dict | None]:
@@ -268,7 +281,9 @@ async def import_analysis(req: ImportAnalysisRequest):
     await asyncio.to_thread(
         save_video_file, resolved_filename, stat.st_size, stat.st_mtime
     )
-    saved = await asyncio.to_thread(save_import_analysis, resolved_filename, scenes)
+    saved = await asyncio.to_thread(
+        save_import_analysis, resolved_filename, scenes, req.product_name
+    )
     return saved
 
 
@@ -307,12 +322,18 @@ async def analyze(req: AnalyzeRequest):
                     req.filename,
                     search_keywords,
                     full_error,
+                    req.product_name,
                 )
             yield sse_event("done", {})
             return
 
         saved = await asyncio.to_thread(
-            save_analysis, history_id, req.filename, search_keywords, full_scenes
+            save_analysis,
+            history_id,
+            req.filename,
+            search_keywords,
+            full_scenes,
+            req.product_name,
         )
         saved_history = saved["history"]
         version_id = saved["version_id"]
@@ -364,6 +385,7 @@ async def analyze(req: AnalyzeRequest):
                 req.filename,
                 search_keywords,
                 full_error,
+                req.product_name,
             )
 
         yield sse_event("done", {})
@@ -552,6 +574,7 @@ class HistoryPayload(BaseModel):
     id: str
     date: int
     keywords: str
+    productName: str = ""
     videos: list[dict]
 
 
@@ -585,3 +608,31 @@ async def remove_history(history_id: str):
     if not deleted:
         return {"error": "not found"}, 404
     return {"ok": True}
+
+
+@app.delete("/api/datasets/{db_video_id}")
+async def remove_dataset(db_video_id: int):
+    deleted = await asyncio.to_thread(delete_dataset, db_video_id)
+    if deleted is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    return {"ok": True, **deleted}
+
+
+@app.post("/api/history/{history_id}/product")
+async def update_history_product(history_id: str, payload: HistoryProductPayload):
+    updated = await asyncio.to_thread(
+        update_history_product_name, history_id, payload.product_name
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="history item not found")
+    return {"history": updated}
+
+
+@app.post("/api/datasets/{db_video_id}/product")
+async def update_dataset_product(db_video_id: int, payload: DatasetProductPayload):
+    updated = await asyncio.to_thread(
+        update_dataset_product_name, db_video_id, payload.product_name_override
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    return {"history": updated}
