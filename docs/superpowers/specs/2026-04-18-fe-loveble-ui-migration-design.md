@@ -1,296 +1,307 @@
-# Thiết Kế Chuyển Toàn Bộ Frontend Sang Giao Diện `fe_loveble`
+# Thiết Kế Thay Toàn Bộ Frontend Sang Giao Diện `data-library-view-main`
 
 ## Mục tiêu
 
-Đổi toàn bộ giao diện của app hiện tại sang visual system và cấu trúc màn hình của bộ thiết kế `fe_loveble`, áp dụng cho đủ 3 khu:
+Thay hoàn toàn frontend của `footage-finder` bằng frontend từ `C:\Users\hoang\OneDrive\Desktop\Workspace\Aff\assets\fe_loveble\data-library-view-main\data-library-view-main`, giữ backend FastAPI hiện tại, và ghép lại các API đang có vào UI mới mà không quay lại giao diện cũ.
 
-- `Thư viện dữ liệu`
-- `Tìm phân cảnh`
-- `Storyboard`
+Kết quả mong muốn của vòng này là repo đích hoạt động như một bản của project nguồn đã được cấy backend thật, thay vì một bản frontend cũ được thay da đổi thịt.
 
-Mục tiêu của vòng này là thay đổi frontend để bám sát giao diện mới nhưng vẫn giữ được đầy đủ hành vi nghiệp vụ đang chạy với backend hiện tại.
+## Quyết định Đã Chốt
 
-Các quyết định đã chốt với người dùng:
+- Xóa sạch giao diện cũ trước khi bê giao diện mới sang.
+- Không giữ song song hai bộ UI.
+- Không giữ fallback sang UI cũ.
+- Bê gần nguyên `src/` của project nguồn; UI, layout, component tree, router, và visual language của project nguồn là chuẩn hiển thị.
+- Mang toàn bộ stack frontend cần thiết của project nguồn để `src` mới chạy đúng.
+- Không dùng API bridge hoặc adapter để đổi shape response.
+- Frontend mới phải tuân theo response hiện tại của API backend.
+- Nếu API thiếu dữ liệu cho một block của UI mới, chỉ phần dữ liệu thiếu đó mới được lấp bằng `fake/mock`.
+- `fake/mock` không được thay cho nghiệp vụ lõi đã có API thật.
+- Backend hiện tại trong `server/` không phải mục tiêu redesign của vòng này.
 
-- ưu tiên số 1 là giữ đủ tính năng hiện tại
-- phạm vi là cả 3 khu, không làm riêng từng page
-- chấp nhận mang khá nhiều cấu trúc frontend từ `fe_loveble` sang nếu cần
-- ưu tiên desktop trước, mobile chỉ cần không vỡ
-- frontend nên tách mạnh theo cấu trúc của mẫu mới, không giữ `App.tsx` kiểu monolith
-- chức năng phải đi theo giao diện mới; nếu giao diện mới không có chỗ phù hợp cho một chức năng cũ thì phải xác nhận lại với người dùng trước khi thêm hoặc đổi layout
+## Nguồn Chuẩn Của Từng Phần
 
-## Bối cảnh hiện tại
+Để tránh nhập nhằng trong lúc triển khai, spec này chốt rõ nguồn chuẩn của từng lớp:
 
-- App hiện tại là Vite + React + Tailwind, nhưng gần như toàn bộ state, API wiring, video control, và markup đang nằm trong `src/App.tsx`.
-- App có 3 khu nghiệp vụ chính: `Library`, `Search`, `Storyboard`.
-- Backend FastAPI và các API hiện tại đang hoạt động thật; đợt này không đổi contract backend làm mục tiêu chính.
-- Bộ thiết kế `fe_loveble` là một frontend tách page/component rõ ràng hơn nhiều, có sẵn cấu trúc cho `LibraryPage`, `SearchPage`, `StoryboardPage`, cùng nhiều UI primitive hỗ trợ.
+- `Project nguồn`: chuẩn cho giao diện, cấu trúc page, router, component tree, styling, và frontend stack.
+- `Backend hiện tại`: chuẩn cho API contract, dữ liệu thật, persistence, upload, analyze, search, trim, storyboard, và lịch sử lưu DB.
+- `Fake/mock`: chỉ là nguồn phụ để lấp dữ liệu còn thiếu ở UI mới khi backend hiện tại chưa trả đủ.
 
-Điểm lệch lớn nhất hiện tại không phải ở nghiệp vụ, mà ở tổ chức frontend:
+Điều này có nghĩa là frontend mới phải thích nghi với response thật của backend hiện có, còn phần dữ liệu thiếu của UI mới sẽ được bù tạm bằng fake tại đúng block cần hiển thị.
 
-- app thật đang monolithic và render trực tiếp từ một file rất lớn
-- app mẫu đã tách theo page, panel, shared component, và layout shell rõ ràng
+## Phạm Vi
 
-Vì vậy, đổi giao diện lần này cần đi kèm một đợt tái tổ chức frontend đủ mạnh để cấu trúc code khớp với giao diện mới, thay vì chỉ đổi className trên file cũ.
+### Bao gồm
 
-## Phạm vi
+- Xóa toàn bộ frontend UI cũ của repo đích trước khi nhập frontend mới.
+- Bê gần nguyên frontend từ project nguồn vào repo đích.
+- Mang theo dependency, config, router, CSS, UI primitives, hooks, util, và asset frontend cần thiết để source mới chạy đúng.
+- Giữ backend FastAPI hiện tại làm nguồn dữ liệu thật duy nhất.
+- Ghép 3 page chính `Library`, `Search`, `Storyboard` với API hiện có.
+- Dùng `fake/mock` có chủ đích cho các block UI mới thiếu dữ liệu backend.
+- Giữ một đường chạy frontend duy nhất là giao diện mới.
 
-Bao gồm:
+### Không bao gồm
 
-- chuyển toàn bộ app sang layout và visual language của `fe_loveble`
-- tách frontend thành app shell và 3 page chính
-- tách các panel, card, list, input area, preview area thành component nhỏ hơn theo page
-- giữ đầy đủ integration với backend thật cho các luồng hiện có
-- giữ các hành vi điều hướng chéo giữa `Library`, `Search`, `Storyboard`
-- map lại các state hiện tại vào page controller hoặc domain hook tương ứng
-- chuẩn hóa các trạng thái `loading`, `empty`, `error`, `success`, `disabled` trong UI mới
-- thiết lập cơ chế xử lý `UI gap` để mọi chỗ không khớp giữa tính năng cũ và mockup mới đều phải được xác nhận lại với người dùng
+- Giữ lại hoặc duy trì song song giao diện cũ.
+- Đổi contract backend chỉ để hợp với UI mới.
+- Viết adapter để map response backend sang một view-model trung gian khác shape gốc.
+- Refactor backend ngoài những chỉnh sửa hạ tầng nhỏ thật sự cần để frontend mới gọi được API cũ mà không làm đổi contract hiện tại.
+- Thêm tính năng sản phẩm mới không có trong project nguồn và cũng không có trong app hiện tại.
 
-Không bao gồm:
+## Kiến Trúc Tổng Thể
 
-- đổi contract backend chỉ để phù hợp với mock frontend mới
-- rewrite logic nghiệp vụ ở backend
-- thêm tính năng sản phẩm mới ngoài những gì app hiện có đang hỗ trợ
-- tự thiết kế thêm block ngoài mẫu mới mà chưa hỏi lại người dùng khi gặp `UI gap`
-- tối ưu mobile sâu trong vòng này
+Hướng triển khai được chọn là `full transplant + direct API integration`.
 
-## Hướng tiếp cận được chọn
+Trình tự kiến trúc ở mức cao:
 
-Chọn hướng `ghép giao diện và cấu trúc page của fe_loveble lên logic thật của app hiện tại`, thay vì:
+1. Xóa hẳn frontend UI cũ trong repo đích.
+2. Đưa frontend của project nguồn vào làm nền chính.
+3. Đưa stack frontend tương ứng vào để app mới chạy được đúng như source mới.
+4. Giữ backend hiện tại nguyên vai trò nguồn dữ liệu thật.
+5. Ghép lần lượt các API hiện có vào các page của frontend mới.
+6. Chỗ nào backend chưa trả đủ dữ liệu cho UI mới thì giữ đúng layout và lấp phần thiếu bằng `fake/mock`.
 
-1. chỉ phủ lại style trên `App.tsx`
-2. bê nguyên mock app của `fe_loveble` sang rồi nối logic thật sau
+Sau bước này, app chỉ còn một app shell, một router, một bộ page, và một hệ component là của giao diện mới.
 
-### Vì sao chọn hướng này
+## Phạm Vi Xóa Và Thay Thế
 
-- Giữ được đầy đủ hành vi và integration đang chạy với backend thật.
-- Cho phép frontend đi gần cấu trúc của mẫu mới ngay từ đầu, nên code sau đợt đổi UI sẽ dễ hiểu và dễ tiếp tục làm việc hơn.
-- Giảm rủi ro so với việc port nguyên một mock app vốn đang dùng dữ liệu giả và stack rộng hơn mức cần thiết.
-- Tránh giải pháp nửa vời kiểu chỉ đổi màu và layout nhưng lõi UI vẫn bị khóa trong một file rất lớn.
+### Xóa trước khi nhập giao diện mới
 
-### Các hướng đã cân nhắc
+Những phần frontend UI cũ của repo đích phải bị xóa trước:
 
-1. Ghép UI mẫu lên logic thật và tách lại frontend theo page/module
+- toàn bộ `src/` hiện tại của `footage-finder`
+- các component, page, layout, hook, lib, và CSS chỉ phục vụ giao diện cũ
+- `App.tsx` cũ theo kiểu orchestration monolith
+- điều hướng bằng state nội bộ của app cũ
 
-- Đây là hướng được chọn.
-- Cân bằng tốt nhất giữa fidelity với mockup và độ an toàn của nghiệp vụ hiện tại.
+### Giữ lại
 
-2. Port mạnh theo toàn bộ cấu trúc kỹ thuật của `fe_loveble`
+Những phần sau không nằm trong phạm vi xóa:
 
-- Có thể cho kết quả gần mockup nhất.
-- Nhưng dễ kéo theo router, test stack, query pattern, và dependency không phục vụ trực tiếp cho app thật ở phase này.
+- `server/`
+- API backend hiện có
+- file môi trường và config backend
+- dữ liệu SQLite, lịch sử phân tích, file upload, và các runtime dependency của backend
+- các cấu hình repo chỉ cần giữ lại để frontend mới vẫn nói chuyện được với backend hiện tại
 
-3. Chỉ làm lớp vỏ giao diện trước, giữ gần như nguyên toàn bộ lõi `App.tsx`
+### Bê sang từ project nguồn
 
-- Nhanh hơn trong ngắn hạn.
-- Nhưng sẽ để lại frontend khó bảo trì, và các mismatch giữa mock layout với logic thật sẽ càng khó gỡ về sau.
+Spec này chốt bê gần nguyên các phần frontend từ project nguồn:
 
-## Kiến trúc frontend mới
+- `src/`
+- app shell và route structure
+- shadcn/ui primitives và component phụ trợ
+- hooks và util của source mới
+- CSS entrypoint, token, và styling structure
+- frontend dependency stack cần cho source mới chạy đúng
+- config frontend liên quan trực tiếp đến source mới như alias, Vite, Tailwind, PostCSS, lint, test nếu chúng là một phần của runtime và workflow mới
 
-Frontend mới sẽ được tổ chức lại theo hướng gần với `fe_loveble` hơn:
+## Dependency, Router, Và Config Frontend
 
-- `App.tsx` hoặc app root chỉ còn vai trò shell cấp cao
-- 3 khu chính trở thành 3 page/module riêng
-- mỗi page có page controller hoặc domain hook riêng
-- các action nghiệp vụ dùng chung được tách thành service/helper độc lập
+### Dependency
 
-### App shell
+Mục tiêu của vòng này không phải tối giản dependency. Mục tiêu là giữ source mới chạy đúng. Vì vậy repo đích được phép mang gần đầy đủ stack frontend của project nguồn nếu đó là điều kiện để `src` mới hoạt động ổn định.
 
-App shell chịu trách nhiệm:
+Các nhóm dependency được coi là trong phạm vi hợp lệ:
 
-- render sidebar điều hướng chính
-- quyết định page đang active
-- giữ các provider hoặc state dùng chung thật sự toàn app
-- điều phối các handoff liên page khi cần
+- router
+- shadcn/ui và các radix primitive liên quan
+- utility package mà component mới đang dùng trực tiếp
+- styling stack của source mới
+- package hỗ trợ animation, form, query, toast, panel, chart, hoặc interaction nếu source mới dùng thật
 
-App shell không còn giữ phần lớn state nghiệp vụ của từng page.
+### Router
 
-### Page-level controller
+Router của project nguồn trở thành router chính của app mới.
 
-Mỗi page có state riêng của nó thay vì để mọi thứ ở root:
+Điều này kéo theo các quyết định sau:
 
-- `LibraryPage`: active dataset, active version, source filter, view mode, scene selection, metadata edit state
-- `SearchPage`: product name của phiên, keyword input, upload queue, analyze state, session videos, result display state
-- `StoryboardPage`: form input, selected source versions, generate state, selected beat, preview state
+- `Library`, `Search`, `Storyboard` đi theo route structure của source mới
+- layout shell của source mới là shell duy nhất
+- không giữ navigation state kiểu app cũ trong `App.tsx`
+- các thao tác chuyển trang từ `Library` sang `Search` hoặc `Storyboard` phải đi theo router mới, dùng đúng context tối thiểu cần truyền đi
 
-Mục tiêu là chia nhỏ state theo đúng nơi người dùng thao tác, để code gần với mental model của UI mới.
+### Config frontend
 
-### Shared service và mapper
+Project nguồn là chuẩn tham chiếu cho phần lớn config frontend, nhưng repo đích vẫn phải giữ các ràng buộc cần cho backend hiện tại hoạt động.
 
-Những phần không nên gắn cứng vào page:
+Nguyên tắc cấu hình:
 
-- API client
-- mapper dữ liệu backend sang UI model
-- helper play scene và sync video time
-- helper trim, export, download
-- utility format time, status badge, source badge
+- ưu tiên config của source mới cho frontend runtime
+- giữ proxy `/api` để trỏ về backend FastAPI hiện tại
+- giữ môi trường dev sao cho frontend mới và backend hiện tại vẫn chạy cùng nhau được
+- nếu có xung đột cấu hình giữa app cũ và app mới, ưu tiên app mới trừ các điểm bắt buộc để backend integration tiếp tục hoạt động
 
-Điều này giúp page component tập trung vào hiển thị và thao tác, không ôm cả parsing và orchestration như hiện tại.
+## Quy Tắc Ghép API
 
-## Thiết kế màn hình
+Spec này chốt một nguyên tắc cứng:
 
-### 1. `LibraryPage`
+- không có API bridge
+- không có adapter đổi shape response
+- không có tầng view-model trung gian khác cấu trúc response thật
 
-`LibraryPage` tiếp tục là nơi xem dữ liệu đã lưu trong DB, nhưng bố cục đi theo mẫu mới: danh sách bên trái, chi tiết bên phải.
+Điều này có nghĩa là page, hook, hoặc helper gọi API chỉ được phép làm các việc sau:
 
-Phần giữ theo `fe_loveble`:
+- gọi đúng endpoint hiện có
+- xử lý request lifecycle
+- kiểm tra lỗi
+- đọc trực tiếp response theo shape backend hiện tại trả về
 
-- header page
-- master-detail layout
-- danh sách nhóm/video ở panel trái
-- detail panel ở phần phải
+Chúng không được phép biến response sang một schema trung gian mới để hợp UI.
 
-Những gì phải map từ app thật sang:
+Khi UI mới cần thêm dữ liệu mà backend chưa có, phần thiếu đó phải được cấp bằng `fake/mock` ngay tại page hoặc block đang cần, thay vì đổi shape dữ liệu thật.
 
-- filter nguồn dữ liệu
-- group theo sản phẩm
+## Thiết Kế Theo Từng Page
+
+### `LibraryPage`
+
+`LibraryPage` ưu tiên dùng dữ liệu thật ở mức cao nhất vì backend hiện tại đã có dữ liệu thư viện, lịch sử, version, scene, và metadata nền tảng.
+
+Phần phải chạy `live`:
+
+- danh sách dataset hoặc video đã lưu
 - chọn dataset active
-- hiển thị badge nguồn và trạng thái dataset
-- chuyển version
-- xem `matched` hoặc `full`
-- phát video theo scene
-- trim clip
-- export SRT
-- cập nhật tên sản phẩm mặc định hoặc override theo video
-- áp dụng lại search result đã lưu
-- mở dataset sang `Search`
-- chọn version cho `Storyboard`
-- xóa dataset
+- version hiện có của video
+- scene list
+- thông tin video cơ bản có sẵn từ backend
+- các action đã có API thật như xóa, trim, export, update tên nếu backend hiện hỗ trợ
+- thao tác mở sang page khác nếu chỉ cần dùng state hoặc context hiện có trên frontend
 
-Rule thiết kế của page này là: chỉ đặt chức năng vào những vùng mà giao diện mới có chỗ hợp lý. Nếu một hành vi hiện tại không có vị trí rõ ràng trong layout mới, nó phải được ghi nhận là `UI gap` và xác nhận lại với người dùng.
+Phần được phép `fake/mock`:
 
-### 2. `SearchPage`
+- badge phụ
+- số liệu phụ
+- metadata bổ sung chỉ để lấp đầy giao diện mới
+- khối insight, summary, hoặc label trang trí mà backend hiện chưa có dữ liệu tương ứng
 
-`SearchPage` giữ bố cục 2 cột của mẫu:
+Nguyên tắc của page này là UI giữ đúng source mới, còn dữ liệu nào backend có thì đổ trực tiếp, dữ liệu nào backend thiếu thì fake đúng phần thiếu đó.
 
-- cột trái là input panel
-- cột phải là kết quả và trạng thái video trong phiên
+### `SearchPage`
 
-Phần bên trái sẽ nhận các chức năng sau nếu chúng khớp tự nhiên với UI mẫu:
+`SearchPage` phải ghép `live` mạnh vì upload, analyze, SSE, và keyword search là nghiệp vụ lõi đang chạy thật.
 
-- nhập tên sản phẩm cho phiên
-- nhập từ khóa
+Phần phải chạy `live`:
+
 - upload video
-- hiển thị danh sách video trong phiên
-- trigger analyze
-- bắt đầu phiên mới
+- danh sách video trong phiên được giữ từ flow upload và analyze hiện có của frontend mới, không đòi thêm một API session mới
+- analyze flow
+- SSE streaming state
+- full analysis result
+- keyword search result
+- trạng thái `pending`, `analyzing`, `success`, `error`
 
-Phần bên phải hiển thị:
+Phần được phép `fake/mock`:
 
-- video result card theo từng video
-- trạng thái `pending/analyzing/success/error`
-- scene list hoặc keyword matches
-- error message theo từng video nếu có
+- card phụ hoặc data summary mà UI mới muốn hiển thị thêm nhưng backend chưa trả
+- số liệu trang trí không thuộc flow chính
+- dữ liệu tạm để giữ đủ bố cục ở các vùng phụ của màn hình
 
-Khi `LibraryPage` chuyển một dataset sang `SearchPage`, page này phải nhận đúng context cần thiết để hiển thị lại video/version/search liên quan, thay vì tạo một session rỗng.
+Page này không được fake phần kết quả chính nếu API thật đã có dữ liệu tương ứng.
 
-### 3. `StoryboardPage`
+### `StoryboardPage`
 
-`StoryboardPage` giữ nhịp 3 cột của mẫu:
+`StoryboardPage` phải ghép `live` ở các phần backend hiện đã hỗ trợ generate storyboard và chọn source từ dữ liệu đã lưu.
 
-- input form
-- source picker hoặc beat list
-- preview panel
+Phần phải chạy `live`:
 
-Page này cần hỗ trợ đủ các hành vi đang có:
+- form generate storyboard
+- danh sách source hoặc version lấy từ dữ liệu lưu thật
+- gọi API generate storyboard
+- beat list và match result ở những trường backend hiện trả được
+- preview footage theo `scene.start/end` khi dữ liệu scene có sẵn
 
-- nhập thông tin sản phẩm, audience, tone, benefits, script
-- chọn source version từ dữ liệu đã lưu
-- generate storyboard
-- xem danh sách beat
-- xem match cho beat đang chọn
-- preview footage đúng theo khoảng thời gian scene
+Phần được phép `fake/mock`:
 
-Các source hiển thị trên page phải đến từ dữ liệu backend thật, không dùng mock source của app mẫu.
+- metadata phụ của preview panel
+- note, score, summary, hoặc thông tin trình bày thêm mà backend chưa có
+- block phụ cần dữ liệu để giữ đúng layout mới nhưng chưa ảnh hưởng đến flow generate hoặc preview chính
 
-## Luồng dữ liệu và điều hướng chéo
+Giống hai page còn lại, page này phải ưu tiên live cho lõi nghiệp vụ và chỉ dùng fake cho phần dữ liệu bổ sung còn thiếu.
 
-Đợt đổi giao diện này không đặt mục tiêu đổi API contract. Backend hiện tại vẫn là nguồn dữ liệu thật.
+## Điều Hướng Và Truyền Context Giữa Page
 
-Frontend mới sẽ thêm một lớp chuyển đổi dữ liệu:
+Vì router của source mới là router chính, các hành vi liên page phải đi theo đường này thay vì quay lại mô hình state monolith cũ.
 
-- backend payload -> UI model dùng trong page mới
-- state lưu trong page -> payload gửi lại backend
+Những handoff cần giữ:
 
-Các action điều hướng chéo giữa page phải có cơ chế handoff rõ ràng, ví dụ:
+- mở từ `Library` sang `Search`
+- mở từ `Library` sang `Storyboard`
+- giữ lại context tối thiểu để page đích biết đang mở dataset, file, hoặc version nào
 
-- mở dataset từ `Library` sang `Search`
-- lấy version đang active trong `Library` sang `Storyboard`
-- quay lại `Library` mà vẫn giữ selection liên quan nếu phù hợp
+Nguyên tắc của spec:
 
-Các action này không nên được cài trực tiếp trong JSX của từng card như hiện tại. Chúng nên đi qua page action hoặc service điều phối nhỏ để page đích nhận đúng context ban đầu.
+- chỉ truyền đúng context tối thiểu cần dùng
+- không tái dựng root state cũ để điều phối toàn app
+- không nhúng lại cấu trúc UI cũ để giải quyết điều hướng chéo
 
-## Strategy cho dependency và component reuse
+## Quy Tắc Dùng `Fake/Mock`
 
-`fe_loveble` có nhiều dependency và UI primitive hơn app hiện tại. Thiết kế của vòng này không yêu cầu bê toàn bộ stack đó sang một cách cơ học.
+`Fake/mock` chỉ là phần đệm để giữ bố cục và visual completeness của giao diện mới khi backend chưa có đủ dữ liệu.
 
-Rule được chọn:
+Spec chốt các quy tắc sau:
 
-- được phép mang sang các primitive, component pattern, hoặc dependency thực sự giúp tái tạo layout và interaction của mẫu mới
-- không bắt buộc mang sang router, query library, test stack, hoặc bất cứ phần nào không phục vụ trực tiếp cho đợt đổi UI
-- ưu tiên reuse component structure của mẫu hơn là reuse nguyên data layer mock của nó
+- chỉ fake phần dữ liệu backend đang thiếu
+- không fake toàn bộ một flow lõi nếu API thật đã hỗ trợ flow đó
+- không đổi contract backend chỉ để loại bỏ fake
+- fake phải được đặt cục bộ theo page hoặc block đang cần, không xây một tầng dữ liệu trung gian mới
+- khi backend sau này trả đủ dữ liệu, phần fake phải thay được bằng dữ liệu thật mà không cần đổi lại layout lớn
 
-Nói cách khác, `fe_loveble` là nguồn cho UI architecture và component language, không phải nguồn chân lý cho app behavior.
+## Error Handling
 
-## Nguyên tắc xử lý `UI gap`
+Frontend mới sẽ có các page vừa dùng `live` vừa dùng `fake`, nên error handling phải rõ ngữ cảnh.
 
-`UI gap` là trường hợp một chức năng hiện tại không có vị trí tự nhiên trong giao diện mới.
+Quy tắc hiển thị lỗi:
 
-Đây là rule bắt buộc của spec:
-
-1. ưu tiên map chức năng vào đúng vùng tương ứng đã có trong mẫu mới
-2. nếu không map được một cách rõ ràng, đánh dấu là `UI gap`
-3. không tự thêm block mới hoặc biến dạng layout lớn để nhét tính năng vào
-4. dừng tại điểm đó và xác nhận lại với người dùng trước khi triển khai tiếp
-
-Rule này đảm bảo implementation luôn đi theo giao diện mới, đúng với quyết định của người dùng, thay vì âm thầm mở rộng mockup trong lúc làm.
-
-## Error handling và trạng thái hiển thị
-
-UI mới phải thể hiện rõ các trạng thái chính sau đây ở đúng ngữ cảnh page:
-
-- `loading`
-- `empty`
-- `error`
-- `disabled`
-- `success`
-
-Yêu cầu cụ thể:
-
-- lỗi analyze, search, storyboard, dataset update, dataset delete phải hiện gần thao tác gây ra lỗi
-- không dồn mọi lỗi vào một vùng thông báo chung nếu page đã có ngữ cảnh hiển thị riêng
-- page không được để trống khó hiểu khi chưa có dữ liệu hoặc khi không có kết quả khớp
-- trạng thái đang xử lý phải khóa hoặc làm rõ action liên quan để tránh thao tác lặp
+- lỗi gọi API thật phải hiện tại đúng page hoặc block đang dùng dữ liệu live
+- lỗi thao tác chính như upload, analyze, search, storyboard generate, delete, trim phải hiện gần action gây ra lỗi
+- page vẫn phải giữ shell và layout của giao diện mới, không đổ sập toàn trang chỉ vì một block live lỗi
+- block đang dùng fake không được chặn flow live của cùng page
+- empty state, loading state, disabled state, và error state phải được thể hiện trong vùng nội dung tương ứng thay vì đẩy mọi thứ vào một thông báo chung
 
 ## Verification
 
-Đợt đổi UI này được coi là hoàn thành khi đạt đủ các điều kiện sau:
+Việc thay frontend chỉ được coi là đạt khi qua đủ ba lớp verify sau.
 
-1. frontend dùng giao diện mới nhất quán với `fe_loveble` trên cả 3 khu `Library`, `Search`, `Storyboard`
-2. các luồng backend hiện tại vẫn chạy qua UI mới
-3. không mất các hành vi cốt lõi của app hiện tại trừ khi đã được người dùng chấp nhận rõ ràng
-4. mọi chỗ lệch khỏi mockup vì không có chỗ chứa chức năng đều đã được xác nhận lại với người dùng
+### 1. Build và runtime
 
-Các bước verify tối thiểu:
+- cài dependency frontend mới thành công
+- `npm run lint` chạy được trên repo sau khi transplant frontend
+- `npm run build` chạy được trên repo sau khi transplant frontend
+- frontend dev server chạy được cùng backend FastAPI hiện tại
+- proxy `/api` tiếp tục trỏ đúng backend hiện tại
 
-- `npm run lint`
-- `npm run build`
-- manual flow cho `Library`, `Search`, `Storyboard` với backend thật
-- regression check cho các luồng quan trọng:
-  - upload và analyze
-  - mở dataset từ `Library` sang `Search`
-  - chọn source version cho `Storyboard`
-  - preview match
-  - trim và tải clip
-  - export SRT
-  - đổi version và áp dụng search result đã lưu
+### 2. Verify theo page
 
-## Kết quả mong muốn
+- `LibraryPage` lên đúng layout của source mới và đọc được dữ liệu thư viện thật ở các vùng lõi
+- `SearchPage` chạy được flow upload, analyze, SSE, và search thật
+- `StoryboardPage` gọi generate thật và hiển thị được dữ liệu thật ở các vùng backend đã hỗ trợ
 
-Sau vòng này, app không chỉ có giao diện mới nhìn giống `fe_loveble`, mà còn có cấu trúc frontend gần với mẫu mới hơn:
+### 3. Verify phần `fake/mock`
 
-- dễ đọc hơn
-- dễ map nghiệp vụ hơn
-- dễ tiếp tục tách nhỏ hoặc mở rộng ở các vòng sau
+- các vùng chưa có dữ liệu backend vẫn render đúng layout bằng fake data
+- fake data không làm hỏng các flow live
+- không có chỗ nào quay lại render giao diện cũ
 
-Quan trọng hơn, toàn bộ việc triển khai sẽ bám vào giao diện mới làm chuẩn hiển thị, còn những chỗ không khớp sẽ được xác nhận lại với người dùng thay vì tự suy diễn.
+## Tiêu Chí Hoàn Thành
+
+Redesign này được coi là hoàn thành khi đạt đủ các điều kiện sau:
+
+1. giao diện cũ đã bị xóa trước khi nhập giao diện mới
+2. frontend mới từ project nguồn trở thành frontend chính duy nhất của repo
+3. router, layout, component tree, và visual language của source mới là đường chạy thực tế của app
+4. backend hiện tại vẫn dùng được qua `/api` mà không cần đổi contract
+5. `Library`, `Search`, và `Storyboard` chạy trên giao diện mới
+6. các nghiệp vụ lõi dùng dữ liệu thật ở những nơi backend đã hỗ trợ
+7. phần dữ liệu còn thiếu của UI mới được lấp bằng fake/mock có chủ đích
+8. không còn đường chạy nào của UI cũ trong app
+
+## Tóm Tắt Thiết Kế
+
+Spec này thay hoàn toàn định hướng cũ từ `ghép giao diện mới lên frontend hiện tại` sang `xóa frontend cũ, bê frontend mới vào làm chuẩn, rồi ghép trực tiếp API backend hiện có`.
+
+Ba nguyên tắc quan trọng nhất của thiết kế là:
+
+- giao diện cũ phải biến mất trước khi giao diện mới đi vào repo
+- frontend mới phải đi theo source mới và response backend hiện tại, không qua adapter đổi shape
+- phần dữ liệu backend còn thiếu được phép fake đúng chỗ, nhưng không được thay cho các luồng nghiệp vụ lõi đã có API thật
