@@ -38,3 +38,30 @@ def get_video_path(filename: str) -> Path:
     if not path.is_file():
         raise FileNotFoundError(f"Video not found: {filename}")
     return path
+
+
+def validate_video_filename(filename: str) -> str:
+    normalized = Path(filename.strip()).name
+    if not normalized:
+        raise ValueError("Tên file không được để trống")
+    if normalized != filename.strip():
+        raise ValueError("Tên file không hợp lệ")
+    if Path(normalized).suffix.lower() not in VIDEO_EXTENSIONS:
+        raise ValueError("Định dạng video không được hỗ trợ")
+    return normalized
+
+
+def rename_video_file(old_filename: str, new_filename: str) -> str:
+    source = get_video_path(old_filename)
+    normalized_new_name = validate_video_filename(new_filename)
+    if source.name == normalized_new_name:
+        raise ValueError("Tên file mới phải khác tên hiện tại")
+
+    destination = (get_video_folder() / normalized_new_name).resolve()
+    if not str(destination).startswith(str(get_video_folder().resolve())):
+        raise ValueError("Tên file không hợp lệ")
+    if destination.exists():
+        raise FileExistsError(f"Video already exists: {normalized_new_name}")
+
+    source.rename(destination)
+    return normalized_new_name

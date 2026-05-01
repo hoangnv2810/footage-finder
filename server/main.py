@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, model_validator
 from starlette.background import BackgroundTask
 
 from analysis import (
@@ -24,24 +24,37 @@ from analysis import (
     validate_import_scenes,
 )
 from db import (
+    create_product_folder,
     delete_dataset,
+    delete_product_folder,
     delete_history,
+    get_video_file_filename,
     get_version_scenes,
     get_video_versions_for_storyboard,
     init_db,
     list_history,
+    list_product_folders,
+    rename_product_folder,
     save_analysis,
     save_analysis_error,
     save_history,
     save_import_analysis,
     save_search_result,
     save_video_file,
+    update_video_file,
     update_dataset_product_name,
+    update_video_selection_by_db_video_id,
     update_history_product_name,
     update_video_selection,
 )
 from sse import sse_event
-from video_folder import get_video_folder, get_video_path, scan_folder
+from video_folder import (
+    get_video_folder,
+    get_video_path,
+    rename_video_file,
+    scan_folder,
+    validate_video_filename,
+)
 
 # Load .env.local then .env
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env.local"))
@@ -194,6 +207,24 @@ class SelectionPayload(BaseModel):
     current_search_keywords: str = ""
 
 
+class DatasetSelectionPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    dbVideoId: int | None = None
+    db_video_id: int | None = None
+    current_version_index: int
+    current_search_keywords: str = ""
+
+    @model_validator(mode="after")
+    def validate_db_video_id(self):
+        if self.dbVideoId is None and self.db_video_id is None:
+            raise ValueError("dbVideoId is required")
+        return self
+
+    def resolved_db_video_id(self) -> int:
+        return self.dbVideoId if self.dbVideoId is not None else self.db_video_id
+
+
 class StoryboardRequest(BaseModel):
     product_name: str
     category: str = ""
@@ -210,6 +241,28 @@ class HistoryProductPayload(BaseModel):
 
 class DatasetProductPayload(BaseModel):
     product_name_override: str = ""
+
+
+class ProductFolderPayload(BaseModel):
+    name: str
+
+
+class UpdateVideoFilePayload(BaseModel):
+    filename: str | None = None
+    folder_id: int | None = None
+
+    @model_validator(mode="after")
+    def validate_changes_present(self):
+        if self.filename is None and self.folder_id is None:
+            raise ValueError("filename hoặc folder_id là bắt buộc")
+        return self
+
+
+def _http_exception_for_value_error(exc: ValueError) -> HTTPException:
+    detail = str(exc)
+    if detail in {"Không tìm thấy thư mục", "Không tìm thấy video"}:
+        return HTTPException(status_code=404, detail=detail)
+    return HTTPException(status_code=400, detail=detail)
 
 
 def _parse_sse_event(event: str) -> tuple[str | None, dict | None]:
@@ -278,11 +331,15 @@ async def import_analysis(req: ImportAnalysisRequest):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     stat = await asyncio.to_thread(video_path.stat)
-    await asyncio.to_thread(
+    video_file_id = await asyncio.to_thread(
         save_video_file, resolved_filename, stat.st_size, stat.st_mtime
     )
     saved = await asyncio.to_thread(
-        save_import_analysis, resolved_filename, scenes, req.product_name
+        save_import_analysis,
+        resolved_filename,
+        video_file_id,
+        scenes,
+        req.product_name,
     )
     return saved
 
@@ -602,6 +659,19 @@ async def post_history_selection(payload: SelectionPayload):
     return {"history": updated}
 
 
+@app.post("/api/datasets/selection")
+async def post_dataset_selection(payload: DatasetSelectionPayload):
+    updated = await asyncio.to_thread(
+        update_video_selection_by_db_video_id,
+        payload.resolved_db_video_id(),
+        payload.current_version_index,
+        payload.current_search_keywords,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    return {"history": updated}
+
+
 @app.delete("/api/history/{history_id}")
 async def remove_history(history_id: str):
     deleted = await asyncio.to_thread(delete_history, history_id)
@@ -636,3 +706,82 @@ async def update_dataset_product(db_video_id: int, payload: DatasetProductPayloa
     if updated is None:
         raise HTTPException(status_code=404, detail="dataset not found")
     return {"history": updated}
+
+
+@app.get("/api/product-folders")
+async def get_product_folders():
+    return {"folders": await asyncio.to_thread(list_product_folders)}
+
+
+@app.post("/api/product-folders")
+async def post_product_folder(payload: ProductFolderPayload):
+    try:
+        return await asyncio.to_thread(create_product_folder, payload.name)
+    except ValueError as exc:
+        raise _http_exception_for_value_error(exc) from exc
+
+
+@app.patch("/api/product-folders/{folder_id}")
+async def patch_product_folder(folder_id: int, payload: ProductFolderPayload):
+    try:
+        return await asyncio.to_thread(rename_product_folder, folder_id, payload.name)
+    except ValueError as exc:
+        raise _http_exception_for_value_error(exc) from exc
+
+
+@app.delete("/api/product-folders/{folder_id}")
+async def remove_product_folder(folder_id: int):
+    try:
+        return await asyncio.to_thread(delete_product_folder, folder_id)
+    except ValueError as exc:
+        raise _http_exception_for_value_error(exc) from exc
+
+
+@app.patch("/api/video-files/{video_file_id}")
+async def patch_video_file(video_file_id: int, payload: UpdateVideoFilePayload):
+    current_filename = await asyncio.to_thread(get_video_file_filename, video_file_id)
+    if current_filename is None:
+        raise HTTPException(status_code=404, detail="video file not found")
+
+    normalized_filename = None
+    renamed_on_disk = False
+    try:
+        if payload.filename is not None:
+            normalized_filename = validate_video_filename(payload.filename)
+            if normalized_filename != current_filename:
+                await asyncio.to_thread(
+                    rename_video_file, current_filename, normalized_filename
+                )
+                renamed_on_disk = True
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileExistsError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    try:
+        return await asyncio.to_thread(
+            update_video_file,
+            video_file_id,
+            normalized_filename,
+            payload.folder_id,
+        )
+    except ValueError as exc:
+        if renamed_on_disk and normalized_filename:
+            try:
+                await asyncio.to_thread(
+                    rename_video_file, normalized_filename, current_filename
+                )
+            except Exception:
+                pass
+        raise _http_exception_for_value_error(exc) from exc
+    except Exception:
+        if renamed_on_disk and normalized_filename:
+            try:
+                await asyncio.to_thread(
+                    rename_video_file, normalized_filename, current_filename
+                )
+            except Exception:
+                pass
+        raise

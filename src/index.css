@@ -1,17 +1,99 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-@layer utilities {
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 16% 8%;
+    --foreground: 210 20% 92%;
+
+    --card: 220 14% 11%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 220 14% 11%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 210 100% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 16%;
+    --secondary-foreground: 210 20% 85%;
+
+    --muted: 220 12% 14%;
+    --muted-foreground: 215 12% 50%;
+
+    --accent: 210 100% 56%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 12% 18%;
+    --input: 220 12% 18%;
+    --ring: 210 100% 56%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 220 16% 6%;
+    --sidebar-foreground: 210 15% 70%;
+    --sidebar-primary: 210 100% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 12%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 220 12% 14%;
+    --sidebar-ring: 210 100% 56%;
+
+    --surface: 220 14% 13%;
+    --surface-hover: 220 14% 16%;
+    --badge-extension: 162 60% 40%;
+    --badge-web: 35 90% 55%;
+    --badge-error: 0 72% 51%;
+    --success: 142 60% 45%;
+
+    --ff-background: hsl(var(--background));
+    --ff-card: hsl(var(--card));
+    --ff-card-soft: hsl(var(--surface));
+    --ff-border: hsl(var(--border));
+    --ff-text: hsl(var(--foreground));
+    --ff-muted: hsl(var(--muted-foreground));
+    --ff-primary: hsl(var(--primary));
+    --ff-danger: hsl(var(--destructive));
   }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+}
+
+@layer base {
+  * {
+    @apply border-border;
   }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #3f3f46; /* zinc-700 */
-    border-radius: 10px;
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
   }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #52525b; /* zinc-600 */
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    margin: 0;
   }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
 }
