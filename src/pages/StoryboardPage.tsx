@@ -21,7 +21,6 @@ interface StoryboardPageProps {
   selectedSavedStoryboardId: string | null;
   selectedStoryboardBeatId: string | null;
   storyboardPreviewMatch: StoryboardMatch | null;
-  storyboardError: string | null;
   isGeneratingStoryboard: boolean;
   activeDataset: DatasetItem | null;
   activeDatasetUsableForStoryboard: boolean;
@@ -59,7 +58,6 @@ export function StoryboardPage({
   selectedSavedStoryboardId,
   selectedStoryboardBeatId,
   storyboardPreviewMatch,
-  storyboardError,
   isGeneratingStoryboard,
   activeDataset,
   activeDatasetUsableForStoryboard,
@@ -126,7 +124,6 @@ export function StoryboardPage({
             />
           </div>
           <div className="shrink-0 border-t border-border bg-card px-3 py-2 sticky bottom-0">
-            {storyboardError ? <div className="mb-2 text-xs text-badge-error">{storyboardError}</div> : null}
             <button
               onClick={onGenerateStoryboard}
               disabled={isGeneratingStoryboard || sourceViews.length === 0 || storyboardSelectedVersionIds.length === 0}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { FileText, Package, Pencil, Trash2 } from 'lucide-react';
 
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import type { SavedStoryboard } from '@/lib/footage-app';
 
 interface StoryboardInputPanelProps {
@@ -51,6 +51,7 @@ export function StoryboardInputPanel({
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [rawJson, setRawJson] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<SavedStoryboard | null>(null);
 
   const filledFields = [productName, category, audience, tone, benefit].filter(Boolean).length;
   const scriptLines = script.trim() ? script.trim().split('\n').length : 0;
@@ -183,7 +184,7 @@ export function StoryboardInputPanel({
                       </span>
                     </button>
                     <button
-                      onClick={() => onDeleteSavedStoryboard(item.id)}
+                      onClick={() => setDeleteTarget(item)}
                       aria-label={`Xóa storyboard ${name}`}
                       className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-badge-error"
                     >
@@ -196,6 +197,34 @@ export function StoryboardInputPanel({
           )}
         </section>
       </div>
+
+      <Dialog open={!!deleteTarget} onOpenChange={(nextOpen) => !nextOpen && setDeleteTarget(null)}>
+        <DialogContent className="rounded-md border-border bg-card p-0 sm:max-w-md">
+          <DialogHeader className="border-b border-border px-4 py-3">
+            <DialogTitle className="text-sm font-medium">Xóa storyboard đã lưu?</DialogTitle>
+            <DialogDescription>
+              Storyboard "{deleteTarget?.productName || 'Chưa nhập sản phẩm'}" sẽ bị xóa khỏi danh sách đã lưu.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="px-4 pb-3 pt-1">
+            <DialogClose asChild>
+              <button className="rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
+                Hủy
+              </button>
+            </DialogClose>
+            <button
+              onClick={() => {
+                if (!deleteTarget) return;
+                onDeleteSavedStoryboard(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+              className="rounded-md bg-badge-error px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-badge-error/90"
+            >
+              Xóa
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

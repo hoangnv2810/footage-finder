@@ -71,7 +71,44 @@ describe('StoryboardInputPanel', () => {
     await waitFor(() => expect(onImportStoryboard).toHaveBeenCalledWith('{"beats":[]}'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Xóa storyboard Serum Vitamin C' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Xóa storyboard đã lưu?')).toBeInTheDocument();
+    expect(onDeleteSavedStoryboard).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa' }));
     expect(onDeleteSavedStoryboard).toHaveBeenCalledWith('storyboard-1');
+  });
+
+  it('does not delete a saved storyboard when confirmation is cancelled', () => {
+    const onDeleteSavedStoryboard = vi.fn();
+
+    render(
+      <StoryboardInputPanel
+        productName="Serum Vitamin C"
+        setProductName={vi.fn()}
+        category="Skincare"
+        setCategory={vi.fn()}
+        audience="Nữ 20-35"
+        setAudience={vi.fn()}
+        tone="Tin cậy"
+        setTone={vi.fn()}
+        benefit="Sáng da"
+        setBenefit={vi.fn()}
+        script="Hook\nDemo"
+        setScript={vi.fn()}
+        savedStoryboards={[savedStoryboard]}
+        selectedStoryboardId="storyboard-1"
+        onCopyInput={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={onDeleteSavedStoryboard}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa storyboard Serum Vitamin C' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
+
+    expect(onDeleteSavedStoryboard).not.toHaveBeenCalled();
   });
 
   it('keeps import dialog and pasted JSON open when import fails', async () => {

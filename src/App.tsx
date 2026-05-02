@@ -3,6 +3,7 @@ import type { ChangeEvent, ReactNode } from 'react';
 
 import { AlertCircle } from 'lucide-react';
 import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { Toaster, toast } from 'sonner';
 
 import { AppLayout } from '@/components/AppLayout';
 import { DeleteFolderDialog } from '@/components/library/DeleteFolderDialog';
@@ -82,7 +83,6 @@ function WorkspaceApp() {
   const [savedStoryboards, setSavedStoryboards] = useState<SavedStoryboard[]>([]);
   const [selectedSavedStoryboardId, setSelectedSavedStoryboardId] = useState<string | null>(null);
   const [selectedStoryboardBeatId, setSelectedStoryboardBeatId] = useState<string | null>(null);
-  const [storyboardError, setStoryboardError] = useState<string | null>(null);
   const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
   const [storyboardPreviewMatch, setStoryboardPreviewMatch] = useState<StoryboardMatch | null>(null);
   // A counter that bumps every time the user explicitly asks to (re)play a match.
@@ -166,7 +166,6 @@ function WorkspaceApp() {
     setStoryboardResult(null);
     setSelectedSavedStoryboardId(null);
     setSelectedStoryboardBeatId(null);
-    setStoryboardError(null);
     setStoryboardPreviewMatch(null);
     storyboardPlaybackRef.current = null;
   }, []);
@@ -181,7 +180,6 @@ function WorkspaceApp() {
     setStoryboardSelectedVersionIds(saved.selectedVersionIds || []);
     setStoryboardResult(saved.result || null);
     setSelectedSavedStoryboardId(saved.id);
-    setStoryboardError(null);
 
     const firstBeatId = saved.result?.beats[0]?.id || null;
     setSelectedStoryboardBeatId(firstBeatId);
@@ -590,7 +588,7 @@ function WorkspaceApp() {
   useEffect(() => {
     api.listStoryboards()
       .then((items) => setSavedStoryboards([...items].sort((a, b) => b.updatedAt - a.updatedAt)))
-      .catch(() => setStoryboardError('Không tải được danh sách storyboard đã lưu.'));
+      .catch(() => toast.error('Không tải được danh sách storyboard đã lưu.'));
   }, []);
 
   const analyzeOnServer = async (filename: string, historyId: string, searchKeywords: string) => {
@@ -647,16 +645,15 @@ function WorkspaceApp() {
   const generateStoryboard = async () => {
     const scriptText = storyboardScript.trim();
     if (!scriptText) {
-      setStoryboardError('Vui lòng nhập kịch bản để tạo storyboard.');
+      toast.error('Vui lòng nhập kịch bản để tạo storyboard.');
       return;
     }
 
     if (storyboardSources.length === 0) {
-      setStoryboardError('Cần có ít nhất một video đã phân tích để tạo storyboard.');
+      toast.error('Cần có ít nhất một video đã phân tích để tạo storyboard.');
       return;
     }
 
-    setStoryboardError(null);
     setGlobalError(null);
     setIsGeneratingStoryboard(true);
     resetStoryboardState();
@@ -675,7 +672,7 @@ function WorkspaceApp() {
       upsertSavedStoryboard(saved);
       restoreSavedStoryboard(saved);
     } catch (error) {
-      setStoryboardError(error instanceof Error ? error.message : 'Không thể tạo storyboard.');
+      toast.error(error instanceof Error ? error.message : 'Không thể tạo storyboard.');
     } finally {
       setIsGeneratingStoryboard(false);
     }
@@ -716,18 +713,18 @@ function WorkspaceApp() {
   const copyStoryboardInput = async () => {
     const scriptText = storyboardScript.trim();
     if (!scriptText) {
-      setStoryboardError('Vui lòng nhập kịch bản trước khi copy input.');
+      toast.error('Vui lòng nhập kịch bản trước khi copy input.');
       return;
     }
 
     if (storyboardSelectedVersionIds.length === 0) {
-      setStoryboardError('Vui lòng chọn ít nhất một version video để copy input.');
+      toast.error('Vui lòng chọn ít nhất một version video để copy input.');
       return;
     }
 
     const candidateScenes = buildSelectedStoryboardCandidates();
     if (candidateScenes.length === 0) {
-      setStoryboardError('Không có scene phù hợp trong các version đã chọn.');
+      toast.error('Không có scene phù hợp trong các version đã chọn.');
       return;
     }
 
@@ -738,23 +735,23 @@ function WorkspaceApp() {
         candidate_scenes: candidateScenes,
       });
       await navigator.clipboard.writeText(prompt);
-      setStoryboardError(null);
+      toast.success('Đã copy input vào clipboard.');
     } catch {
-      setStoryboardError('Không thể copy input vào clipboard.');
+      toast.error('Không thể copy input vào clipboard.');
     }
   };
 
   const importStoryboard = async (rawJson: string) => {
     const scriptText = storyboardScript.trim();
     if (!scriptText) {
-      setStoryboardError('Vui lòng nhập kịch bản trước khi import storyboard.');
+      toast.error('Vui lòng nhập kịch bản trước khi import storyboard.');
       throw new Error('Vui lòng nhập kịch bản trước khi import storyboard.');
     }
     try {
       assertCanImportStoryboard(storyboardSelectedVersionIds);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Vui lòng chọn ít nhất một video để import storyboard.';
-      setStoryboardError(message);
+      toast.error(message);
       throw new Error(message);
     }
 
@@ -762,11 +759,10 @@ function WorkspaceApp() {
     try {
       resultJson = JSON.parse(rawJson);
     } catch {
-      setStoryboardError('JSON storyboard không hợp lệ.');
+      toast.error('JSON storyboard không hợp lệ.');
       throw new Error('JSON storyboard không hợp lệ.');
     }
 
-    setStoryboardError(null);
     setIsGeneratingStoryboard(true);
     try {
       const saved = await api.importStoryboard({
@@ -779,7 +775,7 @@ function WorkspaceApp() {
       restoreSavedStoryboard(saved);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể import storyboard.';
-      setStoryboardError(message);
+      toast.error(message);
       throw new Error(message);
     } finally {
       setIsGeneratingStoryboard(false);
@@ -787,18 +783,16 @@ function WorkspaceApp() {
   };
 
   const selectSavedStoryboard = async (id: string) => {
-    setStoryboardError(null);
     try {
       const saved = await api.getStoryboard(id);
       upsertSavedStoryboard(saved);
       restoreSavedStoryboard(saved);
     } catch (error) {
-      setStoryboardError(error instanceof Error ? error.message : 'Không thể mở storyboard đã lưu.');
+      toast.error(error instanceof Error ? error.message : 'Không thể mở storyboard đã lưu.');
     }
   };
 
   const deleteSavedStoryboard = async (id: string) => {
-    setStoryboardError(null);
     try {
       await api.deleteStoryboard(id);
       setSavedStoryboards((prev) => prev.filter((item) => item.id !== id));
@@ -809,7 +803,7 @@ function WorkspaceApp() {
         setStoryboardPreviewMatch(null);
       }
     } catch (error) {
-      setStoryboardError(error instanceof Error ? error.message : 'Không thể xóa storyboard đã lưu.');
+      toast.error(error instanceof Error ? error.message : 'Không thể xóa storyboard đã lưu.');
     }
   };
 
@@ -1252,7 +1246,6 @@ function WorkspaceApp() {
               selectedSavedStoryboardId={selectedSavedStoryboardId}
               selectedStoryboardBeatId={selectedStoryboardBeatId}
               storyboardPreviewMatch={resolvedStoryboardPreviewMatch}
-              storyboardError={storyboardError}
               isGeneratingStoryboard={isGeneratingStoryboard}
               activeDataset={activeDataset}
               activeDatasetUsableForStoryboard={activeDatasetUsableForStoryboard}
@@ -1316,6 +1309,7 @@ function WorkspaceApp() {
         isSubmitting={assetMutating}
         onDelete={submitDeleteFolder}
       />
+      <Toaster position="top-center" richColors theme="dark" />
     </AppLayout>
   );
 }
