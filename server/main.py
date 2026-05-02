@@ -773,43 +773,40 @@ def _run_ffmpeg(args: list[str]) -> subprocess.CompletedProcess:
 
 
 def _trim(input_path: str, output_path: str, start: float, end: float) -> None:
+    duration = end - start
+    if duration <= 0:
+        raise ValueError(f"Invalid trim range: start={start}, end={end}")
+
+    # Always re-encode so the very first frame is a clean keyframe.
+    # Stream-copy (`-c copy`) starts at the nearest keyframe BEFORE `start`,
+    # leaving the player with corrupt / frozen frames until the next keyframe
+    # inside the requested window arrives — the user sees a still image with
+    # the progress bar moving.
+    #
+    # `-ss` BEFORE `-i` (input seeking) makes ffmpeg jump near the target
+    # position using the container index before decoding, so it's fast even
+    # for large files.  `-t` limits by *duration* (not absolute timestamp).
     result = _run_ffmpeg(
         [
             "-y",
-            "-i",
-            input_path,
             "-ss",
             str(start),
-            "-to",
-            str(end),
-            "-c",
-            "copy",
-            "-avoid_negative_ts",
-            "make_zero",
-            output_path,
-        ]
-    )
-
-    if result.returncode == 0 and os.path.getsize(output_path) > 0:
-        return
-
-    logger.info("Stream copy failed or empty output, falling back to re-encode")
-
-    result = _run_ffmpeg(
-        [
-            "-y",
             "-i",
             input_path,
-            "-ss",
-            str(start),
-            "-to",
-            str(end),
+            "-t",
+            str(duration),
             "-c:v",
             "libx264",
             "-preset",
-            "ultrafast",
+            "fast",
+            "-crf",
+            "18",
             "-c:a",
             "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "+faststart",
             output_path,
         ]
     )
