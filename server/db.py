@@ -340,6 +340,22 @@ def init_db() -> None:
             created_at INTEGER NOT NULL,
             UNIQUE(product_folder_id, video_file_id)
         );
+
+        CREATE TABLE IF NOT EXISTS storyboard_project (
+            id TEXT PRIMARY KEY,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            product_name TEXT NOT NULL DEFAULT '',
+            category TEXT NOT NULL DEFAULT '',
+            target_audience TEXT NOT NULL DEFAULT '',
+            tone TEXT NOT NULL DEFAULT '',
+            key_benefits TEXT NOT NULL DEFAULT '',
+            script_text TEXT NOT NULL DEFAULT '',
+            selected_version_ids TEXT NOT NULL DEFAULT '[]',
+            candidate_snapshot_json TEXT NOT NULL DEFAULT '[]',
+            result_json TEXT NOT NULL DEFAULT '{}',
+            source TEXT NOT NULL DEFAULT 'generated'
+        );
     """
     )
 
@@ -377,6 +393,26 @@ def init_db() -> None:
 
     if not _has_column(conn, "history_video", "video_file_id"):
         conn.execute("ALTER TABLE history_video ADD COLUMN video_file_id INTEGER")
+
+    storyboard_columns = {
+        "created_at": "INTEGER NOT NULL DEFAULT 0",
+        "updated_at": "INTEGER NOT NULL DEFAULT 0",
+        "product_name": "TEXT NOT NULL DEFAULT ''",
+        "category": "TEXT NOT NULL DEFAULT ''",
+        "target_audience": "TEXT NOT NULL DEFAULT ''",
+        "tone": "TEXT NOT NULL DEFAULT ''",
+        "key_benefits": "TEXT NOT NULL DEFAULT ''",
+        "script_text": "TEXT NOT NULL DEFAULT ''",
+        "selected_version_ids": "TEXT NOT NULL DEFAULT '[]'",
+        "candidate_snapshot_json": "TEXT NOT NULL DEFAULT '[]'",
+        "result_json": "TEXT NOT NULL DEFAULT '{}'",
+        "source": "TEXT NOT NULL DEFAULT 'generated'",
+    }
+    for column, definition in storyboard_columns.items():
+        if not _has_column(conn, "storyboard_project", column):
+            conn.execute(
+                f"ALTER TABLE storyboard_project ADD COLUMN {column} {definition}"
+            )
 
     _backfill_video_asset_metadata(conn)
 
@@ -1019,6 +1055,124 @@ def get_video_versions_for_storyboard(version_ids: list[str]) -> list[dict]:
     }
 
     return [by_id[version_id] for version_id in version_ids if version_id in by_id]
+
+
+def _new_storyboard_id() -> str:
+    return f"storyboard-{uuid.uuid4().hex}"
+
+
+def _safe_json_value(raw: str, fallback: Any, expected_type: type) -> Any:
+    try:
+        value = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return fallback
+    if not isinstance(value, expected_type):
+        return fallback
+    return value
+
+
+def _storyboard_row_to_dict(row: sqlite3.Row, include_result: bool) -> dict:
+    result = _safe_json_value(row["result_json"], {}, dict)
+    selected_version_ids = _safe_json_value(row["selected_version_ids"], [], list)
+    candidate_snapshot = _safe_json_value(row["candidate_snapshot_json"], [], list)
+    payload = {
+        "id": row["id"],
+        "createdAt": row["created_at"],
+        "updatedAt": row["updated_at"],
+        "productName": row["product_name"],
+        "category": row["category"],
+        "targetAudience": row["target_audience"],
+        "tone": row["tone"],
+        "keyBenefits": row["key_benefits"],
+        "scriptText": row["script_text"],
+        "selectedVersionIds": selected_version_ids,
+        "candidateSnapshot": candidate_snapshot,
+        "source": row["source"],
+        "beatCount": len(result.get("beats", [])),
+    }
+    if include_result:
+        payload["result"] = result
+    return payload
+
+
+def save_storyboard_project(payload: dict[str, Any]) -> dict:
+    conn = _get_conn()
+    now = int(time.time() * 1000)
+    storyboard_id = payload.get("id") or _new_storyboard_id()
+    created_at = payload.get("createdAt") or now
+    conn.execute(
+        """
+        INSERT INTO storyboard_project (
+            id, created_at, updated_at, product_name, category, target_audience,
+            tone, key_benefits, script_text, selected_version_ids,
+            candidate_snapshot_json, result_json, source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            updated_at = excluded.updated_at,
+            product_name = excluded.product_name,
+            category = excluded.category,
+            target_audience = excluded.target_audience,
+            tone = excluded.tone,
+            key_benefits = excluded.key_benefits,
+            script_text = excluded.script_text,
+            selected_version_ids = excluded.selected_version_ids,
+            candidate_snapshot_json = excluded.candidate_snapshot_json,
+            result_json = excluded.result_json,
+            source = excluded.source
+        """,
+        (
+            storyboard_id,
+            created_at,
+            now,
+            payload.get("product_name") or payload.get("productName") or "",
+            payload.get("category") or "",
+            payload.get("target_audience") or payload.get("targetAudience") or "",
+            payload.get("tone") or "",
+            payload.get("key_benefits") or payload.get("keyBenefits") or "",
+            payload.get("script_text") or payload.get("scriptText") or "",
+            json.dumps(
+                payload.get("selected_version_ids")
+                or payload.get("selectedVersionIds")
+                or [],
+                ensure_ascii=False,
+            ),
+            json.dumps(
+                payload.get("candidate_snapshot")
+                or payload.get("candidateSnapshot")
+                or [],
+                ensure_ascii=False,
+            ),
+            json.dumps(payload.get("result") or {}, ensure_ascii=False),
+            payload.get("source") or "generated",
+        ),
+    )
+    conn.commit()
+    return get_storyboard_project(storyboard_id)
+
+
+def list_storyboard_projects() -> list[dict]:
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM storyboard_project ORDER BY updated_at DESC, created_at DESC"
+    ).fetchall()
+    return [_storyboard_row_to_dict(row, include_result=False) for row in rows]
+
+
+def get_storyboard_project(storyboard_id: str) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT * FROM storyboard_project WHERE id = ?", (storyboard_id,)
+    ).fetchone()
+    if not row:
+        return None
+    return _storyboard_row_to_dict(row, include_result=True)
+
+
+def delete_storyboard_project(storyboard_id: str) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM storyboard_project WHERE id = ?", (storyboard_id,))
+    conn.commit()
+    return cur.rowcount > 0
 
 
 def save_search_result(

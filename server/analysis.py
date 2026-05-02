@@ -15,6 +15,7 @@ DASHSCOPE_CHAT_URL = (
     "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
 )
 DEFAULT_MODEL = "qwen3.6-plus"
+DASHSCOPE_TIMEOUT_SECONDS = float(os.environ.get("DASHSCOPE_TIMEOUT_SECONDS", "600"))
 MAX_STORYBOARD_SCENES = 200
 logger = logging.getLogger(__name__)
 SCENE_STRING_FIELDS = (
@@ -266,6 +267,154 @@ def _normalize_usage_type(value: Any) -> str:
     )
 
 
+def _normalize_imported_usage_type(value: Any) -> str:
+    if value in (None, ""):
+        return _normalize_usage_type(value)
+    normalized = str(value).strip()
+    if normalized not in {"direct_product", "illustrative_broll"}:
+        raise ValueError(f"usageType không hợp lệ: {normalized}")
+    return normalized
+
+
+def build_candidate_snapshot(
+    candidate_versions: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    candidate_scenes: list[dict[str, Any]] = []
+    candidate_map: dict[str, dict[str, Any]] = {}
+
+    for version in candidate_versions:
+        version_id = version["versionId"]
+        file_name = version["fileName"]
+        scenes = version.get("scenes", [])
+        for scene_index, scene in enumerate(scenes):
+            normalized_scene = normalize_scene(scene if isinstance(scene, dict) else {})
+            candidate_id = f"{version_id}:{scene_index}"
+            candidate_entry = {
+                "candidate_id": candidate_id,
+                "file_name": file_name,
+                "video_version_id": version_id,
+                "scene_index": scene_index,
+                "keyword": normalized_scene["keyword"],
+                "description": normalized_scene["description"],
+                "context": normalized_scene["context"],
+                "subjects": normalized_scene["subjects"],
+                "actions": normalized_scene["actions"],
+                "mood": normalized_scene["mood"],
+                "shot_type": normalized_scene["shot_type"],
+                "marketing_uses": normalized_scene["marketing_uses"],
+                "relevance_notes": normalized_scene["relevance_notes"],
+                "start": normalized_scene["start"],
+                "end": normalized_scene["end"],
+            }
+            candidate_scenes.append(candidate_entry)
+            candidate_map[candidate_id] = {
+                "videoVersionId": version_id,
+                "fileName": file_name,
+                "sceneIndex": scene_index,
+                "scene": normalized_scene,
+            }
+
+    return candidate_scenes, candidate_map
+
+
+def _normalize_score(value: Any) -> float:
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(score, 1.0))
+
+
+def _normalize_imported_beat(beat: Any, index: int) -> dict[str, Any]:
+    beat_obj = beat if isinstance(beat, dict) else {}
+    duration_hint = beat_obj.get("durationHint", beat_obj.get("duration_hint"))
+    try:
+        normalized_duration = (
+            float(duration_hint) if duration_hint not in (None, "") else None
+        )
+    except (TypeError, ValueError):
+        normalized_duration = None
+
+    return {
+        "id": str(beat_obj.get("id") or f"beat-{index + 1}").strip(),
+        "label": str(beat_obj.get("label") or f"beat-{index + 1}").strip(),
+        "text": str(beat_obj.get("text") or "").strip(),
+        "intent": str(beat_obj.get("intent") or "").strip(),
+        "desiredVisuals": str(
+            beat_obj.get("desiredVisuals", beat_obj.get("desired_visuals")) or ""
+        ).strip(),
+        "durationHint": normalized_duration,
+        "position": beat_obj.get("position", index),
+    }
+
+
+def normalize_imported_storyboard(
+    payload: Any, candidate_map: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("Storyboard import phải là JSON object.")
+
+    raw_beats = payload.get("beats")
+    if not isinstance(raw_beats, list) or not raw_beats:
+        raise ValueError("Storyboard import thiếu danh sách beat.")
+
+    beats = [_normalize_imported_beat(beat, index) for index, beat in enumerate(raw_beats)]
+    by_beat_id: dict[str, list[dict[str, Any]]] = {beat["id"]: [] for beat in beats}
+
+    raw_beat_matches = payload.get("beatMatches", [])
+    if not isinstance(raw_beat_matches, list):
+        raw_beat_matches = []
+
+    for beat_entry in raw_beat_matches:
+        if not isinstance(beat_entry, dict):
+            continue
+        beat_id = str(beat_entry.get("beatId", beat_entry.get("beat_id")) or "").strip()
+        if beat_id not in by_beat_id:
+            continue
+        matches = beat_entry.get("matches", [])
+        if not isinstance(matches, list):
+            continue
+
+        normalized_matches: list[dict[str, Any]] = []
+        for match in matches[:5]:
+            if not isinstance(match, dict):
+                continue
+            candidate_id = str(
+                match.get("candidateId", match.get("candidate_id")) or ""
+            ).strip()
+            candidate = candidate_map.get(candidate_id)
+            if not candidate:
+                raise ValueError(f"Không tìm thấy candidate scene: {candidate_id}")
+
+            normalized_matches.append(
+                {
+                    "id": f"{beat_id}:{candidate_id}",
+                    "beatId": beat_id,
+                    "videoVersionId": candidate["videoVersionId"],
+                    "fileName": candidate["fileName"],
+                    "sceneIndex": candidate["sceneIndex"],
+                    "score": _normalize_score(match.get("score")),
+                    "matchReason": str(
+                        match.get("matchReason", match.get("match_reason")) or ""
+                    ).strip(),
+                    "usageType": _normalize_imported_usage_type(
+                        match.get("usageType", match.get("usage_type"))
+                    ),
+                    "scene": candidate["scene"],
+                }
+            )
+        by_beat_id[beat_id] = normalized_matches
+
+    return {
+        "beats": beats,
+        "beatMatches": [
+            {"beatId": beat["id"], "matches": by_beat_id.get(beat["id"], [])}
+            for beat in beats
+        ],
+        "models": get_model_config(),
+    }
+
+
 def extract_storyboard_matches(
     response_text: str,
     candidate_map: dict[str, dict[str, Any]],
@@ -297,11 +446,6 @@ def extract_storyboard_matches(
             if not candidate:
                 continue
 
-            try:
-                score = float(match.get("score", 0))
-            except (TypeError, ValueError):
-                score = 0.0
-
             normalized_matches.append(
                 {
                     "id": f"{beat_id}:{candidate_id}",
@@ -309,7 +453,7 @@ def extract_storyboard_matches(
                     "videoVersionId": candidate["videoVersionId"],
                     "fileName": candidate["fileName"],
                     "sceneIndex": candidate["sceneIndex"],
-                    "score": max(0.0, min(score, 1.0)),
+                    "score": _normalize_score(match.get("score", 0)),
                     "matchReason": str(match.get("match_reason") or "").strip(),
                     "usageType": _normalize_usage_type(match.get("usage_type")),
                     "scene": candidate["scene"],
@@ -372,7 +516,7 @@ async def _request_completion(
         "modalities": ["text"],
     }
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(DASHSCOPE_TIMEOUT_SECONDS)) as client:
         resp = await client.post(
             DASHSCOPE_CHAT_URL,
             json=payload,
@@ -493,40 +637,7 @@ async def generate_storyboard(
     if not candidate_versions:
         raise ValueError("Không có video đã phân tích nào để tạo storyboard.")
 
-    candidate_scenes: list[dict[str, Any]] = []
-    candidate_map: dict[str, dict[str, Any]] = {}
-
-    for version in candidate_versions:
-        version_id = version["versionId"]
-        file_name = version["fileName"]
-        scenes = version.get("scenes", [])
-        for scene_index, scene in enumerate(scenes):
-            normalized_scene = normalize_scene(scene if isinstance(scene, dict) else {})
-            candidate_id = f"{version_id}:{scene_index}"
-            candidate_entry = {
-                "candidate_id": candidate_id,
-                "file_name": file_name,
-                "video_version_id": version_id,
-                "scene_index": scene_index,
-                "keyword": normalized_scene["keyword"],
-                "description": normalized_scene["description"],
-                "context": normalized_scene["context"],
-                "subjects": normalized_scene["subjects"],
-                "actions": normalized_scene["actions"],
-                "mood": normalized_scene["mood"],
-                "shot_type": normalized_scene["shot_type"],
-                "marketing_uses": normalized_scene["marketing_uses"],
-                "relevance_notes": normalized_scene["relevance_notes"],
-                "start": normalized_scene["start"],
-                "end": normalized_scene["end"],
-            }
-            candidate_scenes.append(candidate_entry)
-            candidate_map[candidate_id] = {
-                "videoVersionId": version_id,
-                "fileName": file_name,
-                "sceneIndex": scene_index,
-                "scene": normalized_scene,
-            }
+    candidate_scenes, candidate_map = build_candidate_snapshot(candidate_versions)
 
     if len(candidate_scenes) > MAX_STORYBOARD_SCENES:
         raise ValueError(

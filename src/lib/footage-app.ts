@@ -20,6 +20,12 @@ export type DatasetSourceFilter = 'all' | DatasetSource;
 export const LIBRARY_PLAYER_SLOT = -1;
 export const FALLBACK_PRODUCT_NAME = 'Chưa gán sản phẩm';
 
+export function assertCanImportStoryboard(selectedVersionIds: string[]) {
+  if (selectedVersionIds.length === 0) {
+    throw new Error('Vui lòng chọn ít nhất một video để import storyboard.');
+  }
+}
+
 export interface VideoVersion {
   id: string;
   timestamp: number;
@@ -153,6 +159,101 @@ export interface StoryboardSource {
   source: DatasetSource;
 }
 
+export interface StoryboardCandidateScene {
+  candidate_id: string;
+  file_name: string;
+  video_version_id: string;
+  scene_index: number;
+  keyword: string;
+  description: string;
+  context?: string;
+  subjects?: string[];
+  actions?: string[];
+  mood?: string;
+  shot_type?: string;
+  marketing_uses?: string[];
+  relevance_notes?: string;
+  start: number;
+  end: number;
+}
+
+export interface StoryboardProductInput {
+  product_name: string;
+  category: string;
+  target_audience: string;
+  tone: string;
+  key_benefits: string;
+}
+
+export interface StoryboardGeneratePayload extends StoryboardProductInput {
+  script_text: string;
+  selected_version_ids: string[];
+}
+
+export interface StoryboardImportPayload extends StoryboardGeneratePayload {
+  result_json: unknown;
+}
+
+export interface SavedStoryboard {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  productName: string;
+  category: string;
+  targetAudience: string;
+  tone: string;
+  keyBenefits: string;
+  scriptText: string;
+  selectedVersionIds: string[];
+  candidateSnapshot: StoryboardCandidateScene[];
+  source: 'generated' | 'imported';
+  beatCount: number;
+  result?: StoryboardResult;
+}
+
+export const buildStoryboardCopyPrompt = (input: {
+  product: StoryboardProductInput;
+  script_text: string;
+  candidate_scenes: StoryboardCandidateScene[];
+}) => {
+  const outputSchema = {
+    beats: [
+      {
+        id: 'beat-1',
+        label: 'Hook',
+        text: 'Script segment text',
+        intent: 'Marketing intent for this beat',
+        desiredVisuals: 'Visual direction for selected footage',
+        durationHint: 3,
+        position: 0,
+      },
+    ],
+    beatMatches: [
+      {
+        beatId: 'beat-1',
+        matches: [
+          {
+            candidateId: 'candidate_id from candidate_scenes',
+            score: 0.95,
+            matchReason: 'Why this candidate matches the beat',
+            usageType: 'direct_product or illustrative_broll',
+          },
+        ],
+      },
+    ],
+  };
+
+  return [
+    'Bạn là chuyên gia dựng storyboard video marketing. Hãy phân tích product context, script_text và candidate_scenes để chọn footage phù hợp cho từng beat.',
+    'Return ONLY valid JSON. Do not include markdown fences, comments, or any extra prose.',
+    `product_context: ${JSON.stringify(input.product, null, 2)}`,
+    `script_text: ${JSON.stringify(input.script_text, null, 2)}`,
+    `candidate_scenes: ${JSON.stringify(input.candidate_scenes, null, 2)}`,
+    `required_output_schema: ${JSON.stringify(outputSchema, null, 2)}`,
+    'Use only candidateId values that exist as candidate_id in candidate_scenes.',
+  ].join('\n\n');
+};
+
 const parseDatasetSelectionId = (datasetId: string) => {
   const trimmed = datasetId.trim();
   if (!/^\d+$/.test(trimmed)) {
@@ -244,6 +345,55 @@ export const api = {
       throw new Error(await readErrorDetail(res));
     }
 
+    return res.json();
+  },
+
+  async listStoryboards(): Promise<SavedStoryboard[]> {
+    const res = await fetch('/api/storyboards');
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res));
+    }
+    const payload = await res.json();
+    return payload.storyboards;
+  },
+
+  async getStoryboard(id: string): Promise<SavedStoryboard> {
+    const res = await fetch(`/api/storyboards/${encodeURIComponent(id)}`);
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res));
+    }
+    return res.json();
+  },
+
+  async generateSavedStoryboard(payload: StoryboardGeneratePayload): Promise<SavedStoryboard> {
+    const res = await fetch('/api/storyboards/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res));
+    }
+    return res.json();
+  },
+
+  async importStoryboard(payload: StoryboardImportPayload): Promise<SavedStoryboard> {
+    const res = await fetch('/api/storyboards/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res));
+    }
+    return res.json();
+  },
+
+  async deleteStoryboard(id: string): Promise<{ deleted: boolean }> {
+    const res = await fetch(`/api/storyboards/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res));
+    }
     return res.json();
   },
 

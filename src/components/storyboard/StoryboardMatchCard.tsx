@@ -1,4 +1,5 @@
 import { Download, Eye } from 'lucide-react';
+import type { KeyboardEvent } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -13,8 +14,21 @@ interface StoryboardMatchCardProps {
 }
 
 export function StoryboardMatchCard({ match, isActive, onPreview, onTrim, isTrimming }: StoryboardMatchCardProps) {
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onPreview();
+    }
+  };
+
   return (
-    <div className={cn('rounded-lg border p-3 transition-colors', isActive ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-border/80 hover:bg-surface-hover')}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onPreview}
+      onKeyDown={handleKeyDown}
+      className={cn('rounded-lg border p-3 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', isActive ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-border/80 hover:bg-surface-hover')}
+    >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className={cn('text-lg font-bold leading-none', match.score >= 80 ? 'text-success' : match.score >= 50 ? 'text-badge-web' : 'text-muted-foreground')}>
@@ -38,10 +52,22 @@ export function StoryboardMatchCard({ match, isActive, onPreview, onTrim, isTrim
       </div>
 
       <div className="flex items-center gap-1.5">
-        <button onClick={onPreview} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors">
+        <button
+          onClick={(event) => {
+            event.stopPropagation();
+            onPreview();
+          }}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors"
+        >
           <Eye className="h-3 w-3" /> Xem
         </button>
-        <button onClick={onTrim} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors">
+        <button
+          onClick={(event) => {
+            event.stopPropagation();
+            onTrim();
+          }}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors"
+        >
           <Download className={`h-3 w-3 ${isTrimming ? 'animate-pulse' : ''}`} /> Cắt & tải
         </button>
       </div>

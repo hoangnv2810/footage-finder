@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { api, buildDatasetItems, FALLBACK_PRODUCT_NAME, normalizeVideo, type HistoryItem } from './footage-app';
+import {
+  api,
+  assertCanImportStoryboard,
+  buildDatasetItems,
+  buildStoryboardCopyPrompt,
+  FALLBACK_PRODUCT_NAME,
+  normalizeVideo,
+  type HistoryItem,
+} from './footage-app';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -216,5 +224,158 @@ describe('api.updateVideoFile', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: 'demo-moi.mp4', folder_id: 3 }),
     });
+  });
+});
+
+describe('assertCanImportStoryboard', () => {
+  it('rejects import before the API call when no source versions are selected', () => {
+    expect(() => assertCanImportStoryboard([])).toThrow(
+      'Vui lòng chọn ít nhất một video để import storyboard.',
+    );
+  });
+});
+
+describe('buildStoryboardCopyPrompt', () => {
+  it('includes storyboard context, candidates, schema, candidate ids, and strict JSON instruction', () => {
+    const prompt = buildStoryboardCopyPrompt({
+      product: {
+        product_name: 'Serum C Glow',
+        category: 'Chăm sóc da',
+        target_audience: 'Nữ 25-35',
+        tone: 'Tin cậy, tươi sáng',
+        key_benefits: 'Sáng da, đều màu',
+      },
+      script_text: 'Mở đầu bằng làn da xỉn màu, kết thúc với da rạng rỡ.',
+      candidate_scenes: [
+        {
+          candidate_id: 'candidate-1',
+          file_name: 'serum-demo.mp4',
+          video_version_id: 'version-1',
+          scene_index: 2,
+          keyword: 'apply serum',
+          description: 'Người mẫu thoa serum trước gương',
+          context: 'Phòng tắm sáng',
+          subjects: ['người mẫu', 'chai serum'],
+          actions: ['thoa serum'],
+          mood: 'fresh',
+          shot_type: 'close-up',
+          marketing_uses: ['before_after'],
+          relevance_notes: 'Cận cảnh texture sản phẩm',
+          start: 4.5,
+          end: 8,
+        },
+      ],
+    });
+
+    expect(prompt).toContain('Serum C Glow');
+    expect(prompt).toContain('script_text');
+    expect(prompt).toContain('Mở đầu bằng làn da xỉn màu');
+    expect(prompt).toContain('candidate_scenes');
+    expect(prompt).toContain('candidate-1');
+    expect(prompt).toContain('Return ONLY valid JSON');
+    expect(prompt).toContain('beats');
+    expect(prompt).toContain('beatMatches');
+    expect(prompt).toContain('candidateId');
+    expect(prompt).toContain('score');
+    expect(prompt).toContain('matchReason');
+    expect(prompt).toContain('usageType');
+  });
+});
+
+describe('saved storyboard api', () => {
+  const payload = {
+    product_name: 'Serum C Glow',
+    category: 'Chăm sóc da',
+    target_audience: 'Nữ 25-35',
+    tone: 'Tin cậy, tươi sáng',
+    key_benefits: 'Sáng da, đều màu',
+    script_text: 'Demo serum trong 30 giây',
+    selected_version_ids: ['version-1'],
+  };
+
+  const savedStoryboard = {
+    id: 'storyboard-1',
+    createdAt: 1710000000000,
+    updatedAt: 1710000000000,
+    productName: 'Serum C Glow',
+    category: 'Chăm sóc da',
+    targetAudience: 'Nữ 25-35',
+    tone: 'Tin cậy, tươi sáng',
+    keyBenefits: 'Sáng da, đều màu',
+    scriptText: 'Demo serum trong 30 giây',
+    selectedVersionIds: ['version-1'],
+    candidateSnapshot: [],
+    source: 'generated' as const,
+    beatCount: 0,
+  };
+
+  it('posts saved storyboard generation to the plural endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => savedStoryboard,
+    } as Response);
+
+    const result = await api.generateSavedStoryboard(payload);
+
+    expect(result).toEqual(savedStoryboard);
+    expect(fetchMock).toHaveBeenCalledWith('/api/storyboards/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  });
+
+  it('posts imported storyboard JSON to the import endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ ...savedStoryboard, source: 'imported' }),
+    } as Response);
+    const importPayload = {
+      ...payload,
+      result_json: { beats: [], beatMatches: [] },
+    };
+
+    await api.importStoryboard(importPayload);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/storyboards/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(importPayload),
+    });
+  });
+
+  it('fetches saved storyboards and returns the storyboards array', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ storyboards: [savedStoryboard] }),
+    } as Response);
+
+    const result = await api.listStoryboards();
+
+    expect(result).toEqual([savedStoryboard]);
+  });
+
+  it('fetches a saved storyboard by encoded id and returns JSON', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => savedStoryboard,
+    } as Response);
+
+    const result = await api.getStoryboard('storyboard 1');
+
+    expect(result).toEqual(savedStoryboard);
+    expect(fetchMock).toHaveBeenCalledWith('/api/storyboards/storyboard%201');
+  });
+
+  it('deletes a saved storyboard by encoded id and returns deletion status', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ deleted: true }),
+    } as Response);
+
+    const result = await api.deleteStoryboard('storyboard 1');
+
+    expect(result).toEqual({ deleted: true });
+    expect(fetchMock).toHaveBeenCalledWith('/api/storyboards/storyboard%201', { method: 'DELETE' });
   });
 });
