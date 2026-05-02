@@ -9,17 +9,20 @@ import time
 from pathlib import Path
 from typing import Any, List
 
+import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, model_validator
 from starlette.background import BackgroundTask
 
 from analysis import (
     analyze_video_stream,
+    build_candidate_snapshot,
     generate_storyboard,
     get_model_config,
+    normalize_imported_storyboard,
     search_analysis_stream,
     validate_import_scenes,
 )
@@ -28,18 +31,22 @@ from db import (
     delete_dataset,
     delete_product_folder,
     delete_history,
+    delete_storyboard_project,
+    get_storyboard_project,
     get_video_file_filename,
     get_version_scenes,
     get_video_versions_for_storyboard,
     init_db,
     list_history,
     list_product_folders,
+    list_storyboard_projects,
     rename_product_folder,
     save_analysis,
     save_analysis_error,
     save_history,
     save_import_analysis,
     save_search_result,
+    save_storyboard_project,
     save_video_file,
     update_video_file,
     update_dataset_product_name,
@@ -168,13 +175,126 @@ async def upload_videos(files: List[UploadFile] = File(...)):
     return {"uploaded": saved}
 
 
+_STREAM_CHUNK_SIZE = 1024 * 1024  # 1 MiB per read; balances throughput and memory.
+
+
+def _parse_range_header(range_header: str, file_size: int) -> tuple[int, int] | None:
+    """Parse a single-range `Range: bytes=start-end` header into a [start, end] pair.
+
+    Returns `None` if the header is malformed or the range falls outside the file.
+    Multi-range requests are intentionally not supported (browsers requesting
+    video playback always use a single range).
+    """
+    if not range_header or not range_header.lower().startswith("bytes="):
+        return None
+
+    spec = range_header[len("bytes=") :].strip()
+    if "," in spec:
+        return None
+
+    start_str, _, end_str = spec.partition("-")
+    try:
+        if start_str == "":
+            # Suffix range: bytes=-N -> last N bytes.
+            if end_str == "":
+                return None
+            length = int(end_str)
+            if length <= 0:
+                return None
+            start = max(file_size - length, 0)
+            end = file_size - 1
+        else:
+            start = int(start_str)
+            end = int(end_str) if end_str else file_size - 1
+    except ValueError:
+        return None
+
+    if start < 0 or start >= file_size or end < start:
+        return None
+
+    end = min(end, file_size - 1)
+    return start, end
+
+
+async def _iter_file_range(path: Path, start: int, end: int):
+    """Async generator yielding `path[start:end+1]` in `_STREAM_CHUNK_SIZE` chunks."""
+    remaining = end - start + 1
+
+    def _open_and_seek():
+        f = open(path, "rb")
+        f.seek(start)
+        return f
+
+    fh = await asyncio.to_thread(_open_and_seek)
+    try:
+        while remaining > 0:
+            chunk_size = min(_STREAM_CHUNK_SIZE, remaining)
+            chunk = await asyncio.to_thread(fh.read, chunk_size)
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            yield chunk
+    finally:
+        await asyncio.to_thread(fh.close)
+
+
 @app.get("/api/videos/{filename}/stream")
-async def stream_video(filename: str):
+async def stream_video(filename: str, range: str | None = Header(default=None)):
+    """Stream a video file with full HTTP Range support.
+
+    The previous implementation returned `FileResponse` which on Starlette
+    0.38.x ignores `Range` headers, returns the entire file with 200 OK and
+    omits `Accept-Ranges`. Browsers that cannot do range requests cannot seek
+    into a video before it has fully buffered, which presented as the bug
+    "some footage matches play from the correct moment, others play from
+    second 0" — small files happened to be fully buffered at click time, big
+    ones were not.
+    """
     path = await asyncio.to_thread(get_video_path, filename)
-    return FileResponse(
-        path=str(path),
+    stat_result = await asyncio.to_thread(os.stat, str(path))
+    file_size = stat_result.st_size
+
+    common_headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'inline; filename="{filename}"',
+        "Cache-Control": "public, max-age=3600",
+    }
+
+    if range is None:
+        # No range requested: return the full file but advertise Accept-Ranges
+        # so the browser knows it can seek on subsequent requests.
+        return StreamingResponse(
+            _iter_file_range(path, 0, file_size - 1),
+            status_code=200,
+            media_type="video/mp4",
+            headers={
+                **common_headers,
+                "Content-Length": str(file_size),
+            },
+        )
+
+    parsed = _parse_range_header(range, file_size)
+    if parsed is None:
+        # Malformed or unsatisfiable range -> 416 with a Content-Range hint.
+        return Response(
+            status_code=416,
+            headers={
+                **common_headers,
+                "Content-Range": f"bytes */{file_size}",
+            },
+        )
+
+    start, end = parsed
+    chunk_length = end - start + 1
+    return StreamingResponse(
+        _iter_file_range(path, start, end),
+        status_code=206,
         media_type="video/mp4",
-        filename=filename,
+        headers={
+            **common_headers,
+            "Content-Length": str(chunk_length),
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+        },
     )
 
 
@@ -233,6 +353,10 @@ class StoryboardRequest(BaseModel):
     key_benefits: str = ""
     script_text: str
     selected_version_ids: list[str]
+
+
+class ImportStoryboardRequest(StoryboardRequest):
+    result_json: Any
 
 
 class HistoryProductPayload(BaseModel):
@@ -530,6 +654,105 @@ async def storyboard_generate(req: StoryboardRequest):
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _storyboard_product(req: StoryboardRequest) -> dict[str, str]:
+    return {
+        "name": req.product_name.strip(),
+        "category": req.category.strip(),
+        "target_audience": req.target_audience.strip(),
+        "tone": req.tone.strip(),
+        "key_benefits": req.key_benefits.strip(),
+    }
+
+
+async def _load_storyboard_candidates(req: StoryboardRequest) -> tuple[list[dict], list[dict], dict]:
+    if not req.script_text.strip():
+        raise HTTPException(status_code=400, detail="script_text is required")
+    if not req.selected_version_ids:
+        raise HTTPException(status_code=400, detail="selected_version_ids is required")
+
+    candidate_versions = await asyncio.to_thread(
+        get_video_versions_for_storyboard, req.selected_version_ids
+    )
+    if not candidate_versions:
+        raise HTTPException(status_code=404, detail="No analyzed video versions found")
+
+    candidate_snapshot, candidate_map = build_candidate_snapshot(candidate_versions)
+    return candidate_versions, candidate_snapshot, candidate_map
+
+
+def _storyboard_save_payload(
+    req: StoryboardRequest, candidate_snapshot: list[dict], result: dict, source: str
+) -> dict[str, Any]:
+    return {
+        "product_name": req.product_name.strip(),
+        "category": req.category.strip(),
+        "target_audience": req.target_audience.strip(),
+        "tone": req.tone.strip(),
+        "key_benefits": req.key_benefits.strip(),
+        "script_text": req.script_text.strip(),
+        "selected_version_ids": req.selected_version_ids,
+        "candidate_snapshot": candidate_snapshot,
+        "result": result,
+        "source": source,
+    }
+
+
+@app.get("/api/storyboards")
+async def storyboards_list():
+    return {"storyboards": await asyncio.to_thread(list_storyboard_projects)}
+
+
+@app.get("/api/storyboards/{storyboard_id}")
+async def storyboards_get(storyboard_id: str):
+    storyboard = await asyncio.to_thread(get_storyboard_project, storyboard_id)
+    if not storyboard:
+        raise HTTPException(status_code=404, detail="Storyboard not found")
+    return storyboard
+
+
+@app.post("/api/storyboards/generate")
+async def storyboards_generate(req: StoryboardRequest):
+    candidate_versions, candidate_snapshot, _candidate_map = await _load_storyboard_candidates(req)
+    try:
+        result = await generate_storyboard(
+            _storyboard_product(req), req.script_text.strip(), candidate_versions
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="Model tạo storyboard quá thời gian chờ. Hãy thử lại hoặc chọn ít video hơn.",
+        ) from exc
+
+    return await asyncio.to_thread(
+        save_storyboard_project,
+        _storyboard_save_payload(req, candidate_snapshot, result, "generated"),
+    )
+
+
+@app.post("/api/storyboards/import")
+async def storyboards_import(req: ImportStoryboardRequest):
+    _candidate_versions, candidate_snapshot, candidate_map = await _load_storyboard_candidates(req)
+    try:
+        result = normalize_imported_storyboard(req.result_json, candidate_map)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return await asyncio.to_thread(
+        save_storyboard_project,
+        _storyboard_save_payload(req, candidate_snapshot, result, "imported"),
+    )
+
+
+@app.delete("/api/storyboards/{storyboard_id}")
+async def storyboards_delete(storyboard_id: str):
+    deleted = await asyncio.to_thread(delete_storyboard_project, storyboard_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Storyboard not found")
+    return {"deleted": True}
 
 
 # --- Trim ---

@@ -15,7 +15,9 @@ import {
   FALLBACK_PRODUCT_NAME,
   LIBRARY_PLAYER_SLOT,
   api,
+  assertCanImportStoryboard,
   buildDatasetItems,
+  buildStoryboardCopyPrompt,
   normalizeHistory,
   normalizeHistoryItem,
   normalizeVideo,
@@ -26,11 +28,15 @@ import {
   type LibraryMutationResult,
   type ProductFolderSummary,
   type Scene,
+  type SavedStoryboard,
+  type StoryboardCandidateScene,
   type StoryboardMatch,
+  type StoryboardProductInput,
   type StoryboardResult,
   type ViewMode,
   type VideoResult,
 } from '@/lib/footage-app';
+import { enforceVideoRangePlayback, playVideoRange } from '@/lib/video-playback';
 
 export default function App() {
   return (
@@ -73,13 +79,18 @@ function WorkspaceApp() {
   const [storyboardScript, setStoryboardScript] = useState('');
   const [storyboardSelectedVersionIds, setStoryboardSelectedVersionIds] = useState<string[]>([]);
   const [storyboardResult, setStoryboardResult] = useState<StoryboardResult | null>(null);
+  const [savedStoryboards, setSavedStoryboards] = useState<SavedStoryboard[]>([]);
+  const [selectedSavedStoryboardId, setSelectedSavedStoryboardId] = useState<string | null>(null);
   const [selectedStoryboardBeatId, setSelectedStoryboardBeatId] = useState<string | null>(null);
   const [storyboardError, setStoryboardError] = useState<string | null>(null);
   const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
   const [storyboardPreviewMatch, setStoryboardPreviewMatch] = useState<StoryboardMatch | null>(null);
+  // A counter that bumps every time the user explicitly asks to (re)play a match.
+  // Same-match clicks change this counter (not the previewMatch identity), which
+  // re-runs the playback effect without remounting the <video> element.
+  const [storyboardPlayToken, setStoryboardPlayToken] = useState(0);
   const storyboardPlayerRef = useRef<HTMLVideoElement | null>(null);
-  const storyboardPlaybackRef = useRef<{ end: number } | null>(null);
-  const storyboardPendingMatchRef = useRef<StoryboardMatch | null>(null);
+  const storyboardPlaybackRef = useRef<{ start: number; end: number; retriedStartSeek?: boolean } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [libraryViewMode, setLibraryViewMode] = useState<ViewMode>('full');
 
@@ -153,11 +164,42 @@ function WorkspaceApp() {
 
   const resetStoryboardState = useCallback(() => {
     setStoryboardResult(null);
+    setSelectedSavedStoryboardId(null);
     setSelectedStoryboardBeatId(null);
     setStoryboardError(null);
     setStoryboardPreviewMatch(null);
     storyboardPlaybackRef.current = null;
-    storyboardPendingMatchRef.current = null;
+  }, []);
+
+  const restoreSavedStoryboard = useCallback((saved: SavedStoryboard) => {
+    setStoryboardProductName(saved.productName || '');
+    setStoryboardCategory(saved.category || '');
+    setStoryboardAudience(saved.targetAudience || '');
+    setStoryboardTone(saved.tone || '');
+    setStoryboardBenefits(saved.keyBenefits || '');
+    setStoryboardScript(saved.scriptText || '');
+    setStoryboardSelectedVersionIds(saved.selectedVersionIds || []);
+    setStoryboardResult(saved.result || null);
+    setSelectedSavedStoryboardId(saved.id);
+    setStoryboardError(null);
+
+    const firstBeatId = saved.result?.beats[0]?.id || null;
+    setSelectedStoryboardBeatId(firstBeatId);
+    // The useEffect on [selectedStoryboardBeatId, storyboardResult] handles
+    // auto-selecting the first match and seeking. We only pre-set the preview
+    // so the UI shows the correct match immediately before the effect runs.
+    const firstMatch = firstBeatId
+      ? saved.result?.beatMatches.find((group) => group.beatId === firstBeatId)?.matches[0] || null
+      : null;
+    setStoryboardPreviewMatch(firstMatch);
+    storyboardPlaybackRef.current = null;
+  }, []);
+
+  const upsertSavedStoryboard = useCallback((saved: SavedStoryboard) => {
+    setSavedStoryboards((prev) => [
+      saved,
+      ...prev.filter((item) => item.id !== saved.id),
+    ].sort((a, b) => b.updatedAt - a.updatedAt));
   }, []);
 
   const syncSearchVideosFromHistory = useCallback((nextHistory: HistoryItem[]) => {
@@ -381,8 +423,9 @@ function WorkspaceApp() {
   useEffect(() => {
     if (!storyboardResult || !selectedStoryboardBeatId) return;
     const firstMatch = storyboardResult.beatMatches.find((group) => group.beatId === selectedStoryboardBeatId)?.matches[0] || null;
+    // Just publish the first match; the playback effect below handles seek+play
+    // once the (possibly remounted) <video> element is ready.
     setStoryboardPreviewMatch(firstMatch);
-    storyboardPendingMatchRef.current = firstMatch;
     storyboardPlaybackRef.current = null;
   }, [selectedStoryboardBeatId, storyboardResult]);
 
@@ -467,83 +510,72 @@ function WorkspaceApp() {
     }
   }, [playScene]);
 
-  const seekStoryboardPreview = useCallback((match: StoryboardMatch) => {
+  // Orchestrates seek+play whenever the previewed match changes, or the user
+  // re-clicks the same match (storyboardPlayToken bumps).
+  //
+  // The previous implementation juggled `storyboardPendingMatchRef` and
+  // `storyboardRequestIdRef` across React's `onLoadedMetadata` prop, plus a
+  // beat-change effect that called `playVideoRange` on the OLD <video> right
+  // before React unmounted it. That second invocation cleared `pending`, so
+  // when the NEW <video> finally fired `loadedmetadata`, the handler bailed
+  // and the user saw the new clip play from second 0.
+  //
+  // This effect runs AFTER React commits the new DOM and AFTER refs are
+  // assigned, so `storyboardPlayerRef.current` already points at the freshly
+  // mounted element. We attach the metadata listener directly via
+  // `addEventListener` so React's synthetic event system can never miss the
+  // event for a quickly-cached video, and the cleanup cancels in-flight seeks
+  // when the user moves on to another match before the previous load resolved.
+  useEffect(() => {
     const player = storyboardPlayerRef.current;
-    if (!player) return;
+    if (!player || !storyboardPreviewMatch) return;
 
-    storyboardPlaybackRef.current = { end: match.scene.end };
-    player.pause();
+    const match = storyboardPreviewMatch;
+    let cancelled = false;
 
-    const startPlayback = () => {
-      storyboardPendingMatchRef.current = null;
-      player.play().catch(() => {});
-    };
-
-    const performSeek = () => {
-      if (Math.abs(player.currentTime - match.scene.start) < 0.05) {
-        startPlayback();
-        return;
-      }
-
-      player.addEventListener('seeked', () => {
-        if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-          startPlayback();
-        } else {
-          player.addEventListener('canplay', startPlayback, { once: true });
-        }
-      }, { once: true });
-
-      if ('fastSeek' in player) {
-        try {
-          player.fastSeek(match.scene.start);
-          return;
-        } catch {
-          // Fall back to currentTime assignment below.
-        }
-      }
-
-      player.currentTime = match.scene.start;
+    const seekAndPlay = () => {
+      if (cancelled) return;
+      storyboardPlaybackRef.current = playVideoRange(player, {
+        start: match.scene.start,
+        end: match.scene.end,
+      });
     };
 
     if (player.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      performSeek();
-      return;
+      seekAndPlay();
+    } else {
+      player.addEventListener('loadedmetadata', seekAndPlay, { once: true });
+      if (player.networkState === HTMLMediaElement.NETWORK_EMPTY) {
+        player.load();
+      }
     }
 
-    storyboardPendingMatchRef.current = match;
-    if (player.networkState === HTMLMediaElement.NETWORK_EMPTY) {
-      player.load();
-    }
-  }, []);
+    return () => {
+      cancelled = true;
+      player.removeEventListener('loadedmetadata', seekAndPlay);
+    };
+    // We intentionally key on the match identity (id) and the explicit
+    // play-token so same-match clicks also re-trigger this effect.
+  }, [storyboardPreviewMatch?.id, storyboardPlayToken]);
 
   const playStoryboardMatch = useCallback((match: StoryboardMatch) => {
-    const sameFile = storyboardPreviewMatch?.fileName === match.fileName;
     setStoryboardPreviewMatch(match);
-
-    if (sameFile && storyboardPlayerRef.current) {
-      seekStoryboardPreview(match);
-      return;
-    }
-
-    storyboardPendingMatchRef.current = match;
-  }, [seekStoryboardPreview, storyboardPreviewMatch?.fileName]);
-
-  const handleStoryboardLoadedMetadata = useCallback(() => {
-    if (storyboardPendingMatchRef.current) {
-      seekStoryboardPreview(storyboardPendingMatchRef.current);
-    }
-  }, [seekStoryboardPreview]);
+    setStoryboardPlayToken((token) => token + 1);
+    storyboardPlaybackRef.current = null;
+  }, []);
 
   const handleStoryboardTimeUpdate = useCallback(() => {
     const player = storyboardPlayerRef.current;
     const bounds = storyboardPlaybackRef.current;
     if (!player || !bounds) return;
 
-    if (player.currentTime >= bounds.end) {
-      player.pause();
-      player.currentTime = bounds.end;
-      storyboardPlaybackRef.current = null;
-    }
+    storyboardPlaybackRef.current = enforceVideoRangePlayback(player, bounds);
+  }, []);
+
+  // Stable ref callback so React only invokes it on actual mount/unmount of
+  // the <video> element (not on every parent render).
+  const setStoryboardPlayer = useCallback((node: HTMLVideoElement | null) => {
+    storyboardPlayerRef.current = node;
   }, []);
 
   useEffect(() => {
@@ -553,6 +585,12 @@ function WorkspaceApp() {
         setFolders(folderItems);
       })
       .catch(() => setGlobalError('Không kết nối được server. Hãy chạy Python server trước.'));
+  }, []);
+
+  useEffect(() => {
+    api.listStoryboards()
+      .then((items) => setSavedStoryboards([...items].sort((a, b) => b.updatedAt - a.updatedAt)))
+      .catch(() => setStoryboardError('Không tải được danh sách storyboard đã lưu.'));
   }, []);
 
   const analyzeOnServer = async (filename: string, historyId: string, searchKeywords: string) => {
@@ -624,7 +662,7 @@ function WorkspaceApp() {
     resetStoryboardState();
 
     try {
-      const result = await api.generateStoryboard({
+      const saved = await api.generateSavedStoryboard({
         product_name: storyboardProductName.trim(),
         category: storyboardCategory.trim(),
         target_audience: storyboardAudience.trim(),
@@ -634,19 +672,144 @@ function WorkspaceApp() {
         selected_version_ids: storyboardSelectedVersionIds,
       });
 
-      setStoryboardResult(result);
-
-      const firstBeatId = result.beats[0]?.id || null;
-      setSelectedStoryboardBeatId(firstBeatId);
-      const firstMatch = firstBeatId
-        ? result.beatMatches.find((group) => group.beatId === firstBeatId)?.matches[0] || null
-        : null;
-      setStoryboardPreviewMatch(firstMatch);
-      storyboardPendingMatchRef.current = firstMatch;
+      upsertSavedStoryboard(saved);
+      restoreSavedStoryboard(saved);
     } catch (error) {
       setStoryboardError(error instanceof Error ? error.message : 'Không thể tạo storyboard.');
     } finally {
       setIsGeneratingStoryboard(false);
+    }
+  };
+
+  const getStoryboardProductInput = (): StoryboardProductInput => ({
+    product_name: storyboardProductName.trim(),
+    category: storyboardCategory.trim(),
+    target_audience: storyboardAudience.trim(),
+    tone: storyboardTone.trim(),
+    key_benefits: storyboardBenefits.trim(),
+  });
+
+  const buildSelectedStoryboardCandidates = (): StoryboardCandidateScene[] => {
+    const selectedIds = new Set(storyboardSelectedVersionIds);
+    return datasetItems.flatMap((dataset) => (dataset.versions || []).flatMap((version) => {
+      if (!selectedIds.has(version.id)) return [];
+      return version.scenes.map((scene, sceneIndex) => ({
+        candidate_id: `${version.id}:${sceneIndex}`,
+        file_name: dataset.fileName,
+        video_version_id: version.id,
+        scene_index: sceneIndex,
+        keyword: scene.keyword,
+        description: scene.description,
+        context: scene.context,
+        subjects: scene.subjects,
+        actions: scene.actions,
+        mood: scene.mood,
+        shot_type: scene.shot_type,
+        marketing_uses: scene.marketing_uses,
+        relevance_notes: scene.relevance_notes,
+        start: scene.start,
+        end: scene.end,
+      }));
+    }));
+  };
+
+  const copyStoryboardInput = async () => {
+    const scriptText = storyboardScript.trim();
+    if (!scriptText) {
+      setStoryboardError('Vui lòng nhập kịch bản trước khi copy input.');
+      return;
+    }
+
+    if (storyboardSelectedVersionIds.length === 0) {
+      setStoryboardError('Vui lòng chọn ít nhất một version video để copy input.');
+      return;
+    }
+
+    const candidateScenes = buildSelectedStoryboardCandidates();
+    if (candidateScenes.length === 0) {
+      setStoryboardError('Không có scene phù hợp trong các version đã chọn.');
+      return;
+    }
+
+    try {
+      const prompt = buildStoryboardCopyPrompt({
+        product: getStoryboardProductInput(),
+        script_text: scriptText,
+        candidate_scenes: candidateScenes,
+      });
+      await navigator.clipboard.writeText(prompt);
+      setStoryboardError(null);
+    } catch {
+      setStoryboardError('Không thể copy input vào clipboard.');
+    }
+  };
+
+  const importStoryboard = async (rawJson: string) => {
+    const scriptText = storyboardScript.trim();
+    if (!scriptText) {
+      setStoryboardError('Vui lòng nhập kịch bản trước khi import storyboard.');
+      throw new Error('Vui lòng nhập kịch bản trước khi import storyboard.');
+    }
+    try {
+      assertCanImportStoryboard(storyboardSelectedVersionIds);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Vui lòng chọn ít nhất một video để import storyboard.';
+      setStoryboardError(message);
+      throw new Error(message);
+    }
+
+    let resultJson: unknown;
+    try {
+      resultJson = JSON.parse(rawJson);
+    } catch {
+      setStoryboardError('JSON storyboard không hợp lệ.');
+      throw new Error('JSON storyboard không hợp lệ.');
+    }
+
+    setStoryboardError(null);
+    setIsGeneratingStoryboard(true);
+    try {
+      const saved = await api.importStoryboard({
+        ...getStoryboardProductInput(),
+        script_text: scriptText,
+        selected_version_ids: storyboardSelectedVersionIds,
+        result_json: resultJson,
+      });
+      upsertSavedStoryboard(saved);
+      restoreSavedStoryboard(saved);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể import storyboard.';
+      setStoryboardError(message);
+      throw new Error(message);
+    } finally {
+      setIsGeneratingStoryboard(false);
+    }
+  };
+
+  const selectSavedStoryboard = async (id: string) => {
+    setStoryboardError(null);
+    try {
+      const saved = await api.getStoryboard(id);
+      upsertSavedStoryboard(saved);
+      restoreSavedStoryboard(saved);
+    } catch (error) {
+      setStoryboardError(error instanceof Error ? error.message : 'Không thể mở storyboard đã lưu.');
+    }
+  };
+
+  const deleteSavedStoryboard = async (id: string) => {
+    setStoryboardError(null);
+    try {
+      await api.deleteStoryboard(id);
+      setSavedStoryboards((prev) => prev.filter((item) => item.id !== id));
+      if (selectedSavedStoryboardId === id) {
+        setSelectedSavedStoryboardId(null);
+        setStoryboardResult(null);
+        setSelectedStoryboardBeatId(null);
+        setStoryboardPreviewMatch(null);
+      }
+    } catch (error) {
+      setStoryboardError(error instanceof Error ? error.message : 'Không thể xóa storyboard đã lưu.');
     }
   };
 
@@ -1085,6 +1248,8 @@ function WorkspaceApp() {
               storyboardSelectedVersionIds={storyboardSelectedVersionIds}
               storyboardSources={storyboardSources}
               storyboardResult={storyboardResult}
+              savedStoryboards={savedStoryboards}
+              selectedSavedStoryboardId={selectedSavedStoryboardId}
               selectedStoryboardBeatId={selectedStoryboardBeatId}
               storyboardPreviewMatch={resolvedStoryboardPreviewMatch}
               storyboardError={storyboardError}
@@ -1098,6 +1263,16 @@ function WorkspaceApp() {
               onStoryboardToneChange={setStoryboardTone}
               onStoryboardBenefitsChange={setStoryboardBenefits}
               onStoryboardScriptChange={setStoryboardScript}
+              onCopyInput={() => {
+                void copyStoryboardInput();
+              }}
+              onImportStoryboard={importStoryboard}
+              onSelectSavedStoryboard={(id) => {
+                void selectSavedStoryboard(id);
+              }}
+              onDeleteSavedStoryboard={(id) => {
+                void deleteSavedStoryboard(id);
+              }}
               onToggleSourceVersion={(versionId, checked) => {
                 setStoryboardSelectedVersionIds((prev) => (
                   checked ? [...prev, versionId] : prev.filter((id) => id !== versionId)
@@ -1109,10 +1284,7 @@ function WorkspaceApp() {
               onTrimMatch={(match) => {
                 void trimAndDownload({ fileName: match.fileName }, match.scene, match.sceneIndex);
               }}
-              onStoryboardPlayerRef={(node) => {
-                storyboardPlayerRef.current = node;
-              }}
-              onStoryboardLoadedMetadata={handleStoryboardLoadedMetadata}
+              onStoryboardPlayerRef={setStoryboardPlayer}
               onStoryboardTimeUpdate={handleStoryboardTimeUpdate}
             />,
           )}

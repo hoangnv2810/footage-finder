@@ -5,7 +5,7 @@ import { StoryboardInputPanel } from '@/components/storyboard/StoryboardInputPan
 import { StoryboardPreviewPanel } from '@/components/storyboard/StoryboardPreviewPanel';
 import { StoryboardSourcePicker } from '@/components/storyboard/StoryboardSourcePicker';
 import type { BeatMatchView, SourceVersionView, StoryboardBeatView } from '@/components/storyboard/types';
-import type { DatasetItem, StoryboardMatch, StoryboardResult, StoryboardSource } from '@/lib/footage-app';
+import type { DatasetItem, SavedStoryboard, StoryboardMatch, StoryboardResult, StoryboardSource } from '@/lib/footage-app';
 
 interface StoryboardPageProps {
   storyboardProductName: string;
@@ -17,6 +17,8 @@ interface StoryboardPageProps {
   storyboardSelectedVersionIds: string[];
   storyboardSources: StoryboardSource[];
   storyboardResult: StoryboardResult | null;
+  savedStoryboards: SavedStoryboard[];
+  selectedSavedStoryboardId: string | null;
   selectedStoryboardBeatId: string | null;
   storyboardPreviewMatch: StoryboardMatch | null;
   storyboardError: string | null;
@@ -30,13 +32,16 @@ interface StoryboardPageProps {
   onStoryboardToneChange: (value: string) => void;
   onStoryboardBenefitsChange: (value: string) => void;
   onStoryboardScriptChange: (value: string) => void;
+  onCopyInput: () => void;
+  onImportStoryboard: (rawJson: string) => void | Promise<void>;
+  onSelectSavedStoryboard: (id: string) => void;
+  onDeleteSavedStoryboard: (id: string) => void;
   onToggleSourceVersion: (versionId: string, checked: boolean) => void;
   onGenerateStoryboard: () => void;
   onSelectBeat: (beatId: string) => void;
   onPlayStoryboardMatch: (match: StoryboardMatch) => void;
   onTrimMatch: (match: StoryboardMatch) => void;
   onStoryboardPlayerRef: (node: HTMLVideoElement | null) => void;
-  onStoryboardLoadedMetadata: () => void;
   onStoryboardTimeUpdate: () => void;
 }
 
@@ -50,6 +55,8 @@ export function StoryboardPage({
   storyboardSelectedVersionIds,
   storyboardSources,
   storyboardResult,
+  savedStoryboards,
+  selectedSavedStoryboardId,
   selectedStoryboardBeatId,
   storyboardPreviewMatch,
   storyboardError,
@@ -63,13 +70,16 @@ export function StoryboardPage({
   onStoryboardToneChange,
   onStoryboardBenefitsChange,
   onStoryboardScriptChange,
+  onCopyInput,
+  onImportStoryboard,
+  onSelectSavedStoryboard,
+  onDeleteSavedStoryboard,
   onToggleSourceVersion,
   onGenerateStoryboard,
   onSelectBeat,
   onPlayStoryboardMatch,
   onTrimMatch,
   onStoryboardPlayerRef,
-  onStoryboardLoadedMetadata,
   onStoryboardTimeUpdate,
 }: StoryboardPageProps) {
   const sourceViews = useMemo(() => storyboardSources.map(toSourceView), [storyboardSources]);
@@ -94,6 +104,13 @@ export function StoryboardPage({
               setBenefit={onStoryboardBenefitsChange}
               script={storyboardScript}
               setScript={onStoryboardScriptChange}
+              savedStoryboards={savedStoryboards}
+              selectedStoryboardId={selectedSavedStoryboardId}
+              onCopyInput={onCopyInput}
+              onImportStoryboard={onImportStoryboard}
+              onSelectSavedStoryboard={onSelectSavedStoryboard}
+              onDeleteSavedStoryboard={onDeleteSavedStoryboard}
+              isImportingStoryboard={isGeneratingStoryboard}
             />
           </div>
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -139,7 +156,6 @@ export function StoryboardPage({
             onPreviewMatch={(match) => onPlayStoryboardMatch(match.rawMatch)}
             onTrimMatch={(match) => onTrimMatch(match.rawMatch)}
             onPlayerRef={onStoryboardPlayerRef}
-            onLoadedMetadata={onStoryboardLoadedMetadata}
             onTimeUpdate={onStoryboardTimeUpdate}
           />
         </div>

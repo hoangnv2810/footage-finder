@@ -10,11 +10,10 @@ interface StoryboardPreviewPanelProps {
   onPreviewMatch: (match: BeatMatchView) => void;
   onTrimMatch: (match: BeatMatchView) => void;
   onPlayerRef: (node: HTMLVideoElement | null) => void;
-  onLoadedMetadata: () => void;
   onTimeUpdate: () => void;
 }
 
-export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, onPreviewMatch, onTrimMatch, onPlayerRef, onLoadedMetadata, onTimeUpdate }: StoryboardPreviewPanelProps) {
+export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, onPreviewMatch, onTrimMatch, onPlayerRef, onTimeUpdate }: StoryboardPreviewPanelProps) {
   if (!beat) {
     return (
       <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
@@ -57,10 +56,10 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
               {previewMatch ? (
                 <div className="rounded-lg bg-black/40 overflow-hidden w-full max-w-[360px]">
                   <video
+                    key={previewMatch.fileName}
                     ref={onPlayerRef}
                     src={`/api/videos/${encodeURIComponent(previewMatch.fileName)}/stream`}
-                    preload="metadata"
-                    onLoadedMetadata={onLoadedMetadata}
+                    preload="auto"
                     onTimeUpdate={onTimeUpdate}
                     controls
                     className="aspect-[9/16] w-full bg-black object-contain"
