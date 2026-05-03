@@ -354,7 +354,8 @@ def init_db() -> None:
             selected_version_ids TEXT NOT NULL DEFAULT '[]',
             candidate_snapshot_json TEXT NOT NULL DEFAULT '[]',
             result_json TEXT NOT NULL DEFAULT '{}',
-            source TEXT NOT NULL DEFAULT 'generated'
+            source TEXT NOT NULL DEFAULT 'generated',
+            folder_id INTEGER
         );
     """
     )
@@ -407,6 +408,7 @@ def init_db() -> None:
         "candidate_snapshot_json": "TEXT NOT NULL DEFAULT '[]'",
         "result_json": "TEXT NOT NULL DEFAULT '{}'",
         "source": "TEXT NOT NULL DEFAULT 'generated'",
+        "folder_id": "INTEGER",
     }
     for column, definition in storyboard_columns.items():
         if not _has_column(conn, "storyboard_project", column):
@@ -1071,6 +1073,22 @@ def _safe_json_value(raw: str, fallback: Any, expected_type: type) -> Any:
     return value
 
 
+def _load_storyboard_folder(folder_id: int | None) -> dict | None:
+    if not folder_id:
+        return None
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT id, name, is_system FROM product_folder WHERE id = ?", (folder_id,)
+    ).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "isSystem": bool(row["is_system"]),
+    }
+
+
 def _storyboard_row_to_dict(row: sqlite3.Row, include_result: bool) -> dict:
     result = _safe_json_value(row["result_json"], {}, dict)
     selected_version_ids = _safe_json_value(row["selected_version_ids"], [], list)
@@ -1088,6 +1106,7 @@ def _storyboard_row_to_dict(row: sqlite3.Row, include_result: bool) -> dict:
         "selectedVersionIds": selected_version_ids,
         "candidateSnapshot": candidate_snapshot,
         "source": row["source"],
+        "folder": _load_storyboard_folder(row["folder_id"] if "folder_id" in row.keys() else None),
         "beatCount": len(result.get("beats", [])),
     }
     if include_result:
@@ -1105,8 +1124,8 @@ def save_storyboard_project(payload: dict[str, Any]) -> dict:
         INSERT INTO storyboard_project (
             id, created_at, updated_at, product_name, category, target_audience,
             tone, key_benefits, script_text, selected_version_ids,
-            candidate_snapshot_json, result_json, source
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            candidate_snapshot_json, result_json, source, folder_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             updated_at = excluded.updated_at,
             product_name = excluded.product_name,
@@ -1118,7 +1137,8 @@ def save_storyboard_project(payload: dict[str, Any]) -> dict:
             selected_version_ids = excluded.selected_version_ids,
             candidate_snapshot_json = excluded.candidate_snapshot_json,
             result_json = excluded.result_json,
-            source = excluded.source
+            source = excluded.source,
+            folder_id = excluded.folder_id
         """,
         (
             storyboard_id,
@@ -1144,6 +1164,7 @@ def save_storyboard_project(payload: dict[str, Any]) -> dict:
             ),
             json.dumps(payload.get("result") or {}, ensure_ascii=False),
             payload.get("source") or "generated",
+            payload.get("folder_id") or payload.get("folderId"),
         ),
     )
     conn.commit()

@@ -68,12 +68,12 @@ export function EditVideoDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden rounded-md border-border bg-card p-0 sm:max-w-lg" aria-describedby={undefined}>
-        <DialogHeader className="border-b border-border px-4 py-3">
-          <DialogTitle className="text-sm font-medium">Sửa video</DialogTitle>
+        <DialogHeader className="border-b border-border px-4 py-2">
+          <DialogTitle className="text-base font-semibold">Sửa video</DialogTitle>
         </DialogHeader>
 
         {video ? (
-          <div className="space-y-3 px-4 py-3">
+          <div className="space-y-3 px-4 py-2">
             <div className="space-y-1.5">
               <p className="text-sm font-normal text-foreground">Thư mục hiện tại</p>
               <div className="rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground">
@@ -128,7 +128,7 @@ export function EditVideoDialog({
           </div>
         ) : null}
 
-        <DialogFooter className="px-4 pb-3 pt-1">
+        <DialogFooter className="px-4 pb-2 pt-1">
           <button
             type="button"
             onClick={() => onOpenChange(false)}

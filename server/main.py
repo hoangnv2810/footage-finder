@@ -353,6 +353,7 @@ class StoryboardRequest(BaseModel):
     key_benefits: str = ""
     script_text: str
     selected_version_ids: list[str]
+    folder_id: int | None = None
 
 
 class ImportStoryboardRequest(StoryboardRequest):
@@ -693,6 +694,7 @@ def _storyboard_save_payload(
         "key_benefits": req.key_benefits.strip(),
         "script_text": req.script_text.strip(),
         "selected_version_ids": req.selected_version_ids,
+        "folder_id": req.folder_id,
         "candidate_snapshot": candidate_snapshot,
         "result": result,
         "source": source,

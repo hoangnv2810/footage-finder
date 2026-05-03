@@ -1,18 +1,27 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+import { ChevronDown, ChevronRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import { StoryboardBeatList } from '@/components/storyboard/StoryboardBeatList';
 import { StoryboardInputPanel } from '@/components/storyboard/StoryboardInputPanel';
 import { StoryboardPreviewPanel } from '@/components/storyboard/StoryboardPreviewPanel';
 import { StoryboardSourcePicker } from '@/components/storyboard/StoryboardSourcePicker';
 import type { BeatMatchView, SourceVersionView, StoryboardBeatView } from '@/components/storyboard/types';
-import type { DatasetItem, SavedStoryboard, StoryboardMatch, StoryboardResult, StoryboardSource } from '@/lib/footage-app';
+import type { DatasetItem, ProductFolderSummary, SavedStoryboard, StoryboardMatch, StoryboardResult, StoryboardSource } from '@/lib/footage-app';
 
 interface StoryboardPageProps {
+  storyboardFolder: ProductFolderSummary | null;
+  storyboardFolders: Array<{
+    folder: ProductFolderSummary;
+    sourceSummary: { videoCount: number; sceneCount: number };
+    storyboardCount: number;
+  }>;
+  storyboardSourceSummary: { videoCount: number; sceneCount: number };
   storyboardProductName: string;
-  storyboardCategory: string;
+  storyboardGender: string;
   storyboardAudience: string;
   storyboardTone: string;
-  storyboardBenefits: string;
+  storyboardRegion: string;
   storyboardScript: string;
   storyboardSelectedVersionIds: string[];
   storyboardSources: StoryboardSource[];
@@ -26,10 +35,10 @@ interface StoryboardPageProps {
   activeDatasetUsableForStoryboard: boolean;
   trimmingScene: string | null;
   onStoryboardProductNameChange: (value: string) => void;
-  onStoryboardCategoryChange: (value: string) => void;
+  onStoryboardGenderChange: (value: string) => void;
   onStoryboardAudienceChange: (value: string) => void;
   onStoryboardToneChange: (value: string) => void;
-  onStoryboardBenefitsChange: (value: string) => void;
+  onStoryboardRegionChange: (value: string) => void;
   onStoryboardScriptChange: (value: string) => void;
   onCopyInput: () => void;
   onImportStoryboard: (rawJson: string) => void | Promise<void>;
@@ -42,14 +51,20 @@ interface StoryboardPageProps {
   onTrimMatch: (match: StoryboardMatch) => void;
   onStoryboardPlayerRef: (node: HTMLVideoElement | null) => void;
   onStoryboardTimeUpdate: () => void;
+  onRenameStoryboardFolder: (folder: ProductFolderSummary) => void;
+  onDeleteStoryboardFolder?: (folder: ProductFolderSummary) => void;
+  onSelectStoryboardFolder: (folderId: number) => void;
 }
 
 export function StoryboardPage({
+  storyboardFolder,
+  storyboardFolders,
+  storyboardSourceSummary,
   storyboardProductName,
-  storyboardCategory,
+  storyboardGender,
   storyboardAudience,
   storyboardTone,
-  storyboardBenefits,
+  storyboardRegion,
   storyboardScript,
   storyboardSelectedVersionIds,
   storyboardSources,
@@ -63,10 +78,10 @@ export function StoryboardPage({
   activeDatasetUsableForStoryboard,
   trimmingScene,
   onStoryboardProductNameChange,
-  onStoryboardCategoryChange,
+  onStoryboardGenderChange,
   onStoryboardAudienceChange,
   onStoryboardToneChange,
-  onStoryboardBenefitsChange,
+  onStoryboardRegionChange,
   onStoryboardScriptChange,
   onCopyInput,
   onImportStoryboard,
@@ -79,51 +94,178 @@ export function StoryboardPage({
   onTrimMatch,
   onStoryboardPlayerRef,
   onStoryboardTimeUpdate,
+  onRenameStoryboardFolder,
+  onDeleteStoryboardFolder,
+  onSelectStoryboardFolder,
 }: StoryboardPageProps) {
   const sourceViews = useMemo(() => storyboardSources.map(toSourceView), [storyboardSources]);
   const beatViews = useMemo(() => toBeatViews(storyboardResult), [storyboardResult]);
   const selectedBeatView = beatViews.find((beat) => beat.id === selectedStoryboardBeatId) || null;
   const previewMatchView = storyboardPreviewMatch ? toBeatMatchView(storyboardPreviewMatch) : null;
+  const folderName = storyboardFolder?.name || 'Chưa phân loại';
+  const activeFolderId = storyboardFolder?.id || null;
+  const [expandedFolderId, setExpandedFolderId] = useState<number | null>(activeFolderId);
+  const [folderMenuOpenId, setFolderMenuOpenId] = useState<number | null>(null);
+  const folderMenuRef = useRef<HTMLDivElement | null>(null);
+  const folderRows = storyboardFolders.length > 0
+    ? storyboardFolders
+    : [{ folder: storyboardFolder, sourceSummary: storyboardSourceSummary, storyboardCount: savedStoryboards.length }].filter((row): row is { folder: ProductFolderSummary; sourceSummary: { videoCount: number; sceneCount: number }; storyboardCount: number } => !!row.folder);
+
+  useEffect(() => {
+    setExpandedFolderId(activeFolderId);
+  }, [activeFolderId]);
+
+  useEffect(() => {
+    if (folderMenuOpenId === null) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!folderMenuRef.current?.contains(event.target as Node)) {
+        setFolderMenuOpenId(null);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFolderMenuOpenId(null);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [folderMenuOpenId]);
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden">
         <div className="w-[360px] border-r border-border shrink-0 flex flex-col bg-card min-h-0 overflow-hidden">
-          <div className="shrink-0">
-            <StoryboardInputPanel
-              productName={storyboardProductName}
-              setProductName={onStoryboardProductNameChange}
-              category={storyboardCategory}
-              setCategory={onStoryboardCategoryChange}
-              audience={storyboardAudience}
-              setAudience={onStoryboardAudienceChange}
-              tone={storyboardTone}
-              setTone={onStoryboardToneChange}
-              benefit={storyboardBenefits}
-              setBenefit={onStoryboardBenefitsChange}
-              script={storyboardScript}
-              setScript={onStoryboardScriptChange}
-              savedStoryboards={savedStoryboards}
-              selectedStoryboardId={selectedSavedStoryboardId}
-              onCopyInput={onCopyInput}
-              onImportStoryboard={onImportStoryboard}
-              onSelectSavedStoryboard={onSelectSavedStoryboard}
-              onDeleteSavedStoryboard={onDeleteSavedStoryboard}
-              isImportingStoryboard={isGeneratingStoryboard}
-            />
+          <div className="custom-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
+            {folderRows.map((row) => {
+              const isActive = row.folder.id === activeFolderId;
+              const isExpanded = isActive && expandedFolderId === row.folder.id;
+              const summary = `${row.sourceSummary.videoCount} video · ${row.sourceSummary.sceneCount} cảnh · ${row.storyboardCount} storyboard`;
+              return (
+                <div key={row.folder.id} className="border-b border-border/60 last:border-b-0">
+                  <div className={`flex items-start gap-1 px-3 py-2.5 transition-colors ${isActive ? 'bg-primary/5' : 'hover:bg-surface-hover'}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFolderMenuOpenId(null);
+                        if (isExpanded) {
+                          setExpandedFolderId(null);
+                          return;
+                        }
+                        setExpandedFolderId(row.folder.id);
+                        if (!isActive) onSelectStoryboardFolder(row.folder.id);
+                      }}
+                      className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                    >
+                      {isExpanded ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                      <span className="min-w-0 flex-1">
+                        <h2 className="block truncate text-sm font-bold text-white">{row.folder.name}</h2>
+                        <span className="mt-0.5 block text-[11px] text-muted-foreground">{summary}</span>
+                      </span>
+                    </button>
+                    {!row.folder.isSystem ? (
+                      <div ref={folderMenuOpenId === row.folder.id ? folderMenuRef : undefined} className="relative shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setFolderMenuOpenId((prev) => (prev === row.folder.id ? null : row.folder.id))}
+                          className="rounded-lg border border-transparent p-1.5 text-muted-foreground transition-colors hover:border-border/70 hover:bg-background hover:text-foreground"
+                          aria-label={`Mở menu thư mục ${row.folder.name}`}
+                          aria-haspopup="menu"
+                          aria-expanded={folderMenuOpenId === row.folder.id}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </button>
+                        {folderMenuOpenId === row.folder.id ? (
+                          <div
+                            role="menu"
+                            className="absolute right-0 top-8 z-20 min-w-[7rem] overflow-hidden rounded-md border border-border bg-card p-0.5 shadow-sm"
+                          >
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setFolderMenuOpenId(null);
+                                onRenameStoryboardFolder(row.folder);
+                              }}
+                              className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-surface-hover"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Sửa
+                            </button>
+                            {onDeleteStoryboardFolder ? (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setFolderMenuOpenId(null);
+                                  onDeleteStoryboardFolder(row.folder);
+                                }}
+                                className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs text-destructive transition-colors hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Xóa
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  {isExpanded ? (
+                    <div className="border-t border-border/50">
+                      <StoryboardInputPanel
+                        productName={storyboardProductName}
+                        setProductName={onStoryboardProductNameChange}
+                        gender={storyboardGender}
+                        setGender={onStoryboardGenderChange}
+                        audience={storyboardAudience}
+                        setAudience={onStoryboardAudienceChange}
+                        tone={storyboardTone}
+                        setTone={onStoryboardToneChange}
+                        region={storyboardRegion}
+                        setRegion={onStoryboardRegionChange}
+                        script={storyboardScript}
+                        setScript={onStoryboardScriptChange}
+                        savedStoryboards={savedStoryboards}
+                        selectedStoryboardId={selectedSavedStoryboardId}
+                        folderName={folderName}
+                        onCopyInput={onCopyInput}
+                        onImportStoryboard={onImportStoryboard}
+                        onSelectSavedStoryboard={onSelectSavedStoryboard}
+                        onDeleteSavedStoryboard={onDeleteSavedStoryboard}
+                        isImportingStoryboard={isGeneratingStoryboard}
+                      />
+                      <div className="min-h-[220px] flex flex-col overflow-hidden">
+                        {activeDataset && !activeDatasetUsableForStoryboard ? (
+                          <div className="mx-3 mt-3 rounded-md border border-badge-web/30 bg-badge-web/10 px-3 py-2 text-xs text-badge-web">
+                            Dataset đang chọn chưa có version usable cho storyboard.
+                          </div>
+                        ) : null}
+                        <div className="border-b border-border px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-white">Nguồn dữ liệu</span>
+                            <span className="text-[11px] text-muted-foreground">{storyboardSourceSummary.videoCount} video · {storyboardSourceSummary.sceneCount} cảnh</span>
+                          </div>
+                        </div>
+                        <StoryboardSourcePicker
+                          sources={sourceViews}
+                          selected={new Set(storyboardSelectedVersionIds)}
+                          onToggle={(id) => onToggleSourceVersion(id, !storyboardSelectedVersionIds.includes(id))}
+                          hideHeader
+                          disableInternalScroll
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {activeDataset && !activeDatasetUsableForStoryboard ? (
-              <div className="mx-3 mt-3 rounded-md border border-badge-web/30 bg-badge-web/10 px-3 py-2 text-xs text-badge-web">
-                Dataset đang chọn chưa có version usable cho storyboard.
-              </div>
-            ) : null}
-            <StoryboardSourcePicker
-              sources={sourceViews}
-              selected={new Set(storyboardSelectedVersionIds)}
-              onToggle={(id) => onToggleSourceVersion(id, !storyboardSelectedVersionIds.includes(id))}
-            />
-          </div>
-          <div className="shrink-0 border-t border-border bg-card px-3 py-2 sticky bottom-0">
+          <div className="shrink-0 border-t border-border bg-card px-3 py-2">
             <button
               onClick={onGenerateStoryboard}
               disabled={isGeneratingStoryboard || sourceViews.length === 0 || storyboardSelectedVersionIds.length === 0}

@@ -11,9 +11,11 @@ interface StoryboardSourcePickerProps {
   sources: SourceVersionView[];
   selected: Set<string>;
   onToggle: (id: string) => void;
+  hideHeader?: boolean;
+  disableInternalScroll?: boolean;
 }
 
-export function StoryboardSourcePicker({ sources, selected, onToggle }: StoryboardSourcePickerProps) {
+export function StoryboardSourcePicker({ sources, selected, onToggle, hideHeader = false, disableInternalScroll = false }: StoryboardSourcePickerProps) {
   const grouped = useMemo(() => {
     const map = new Map<string, SourceVersionView[]>();
     sources.forEach((source) => {
@@ -36,15 +38,17 @@ export function StoryboardSourcePicker({ sources, selected, onToggle }: Storyboa
   };
 
   return (
-    <div className="flex flex-col min-h-0 h-full overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-        <span className="text-sm font-bold text-white">Nguồn dữ liệu</span>
-        <span className={cn('px-1.5 py-0.5 rounded text-[11px] font-semibold', selected.size > 0 ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground')}>
-          {selected.size} đã chọn
-        </span>
-      </div>
+    <div className={cn('flex flex-col min-h-0', disableInternalScroll ? '' : 'h-full overflow-hidden')}>
+      {!hideHeader ? (
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
+          <span className="text-sm font-bold text-white">Nguồn dữ liệu</span>
+          <span className={cn('px-1.5 py-0.5 rounded text-[11px] font-semibold', selected.size > 0 ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground')}>
+            {selected.size} đã chọn
+          </span>
+        </div>
+      ) : null}
 
-      <div className="custom-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
+      <div className={cn(disableInternalScroll ? '' : 'custom-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain')}>
         {Array.from(grouped.entries()).map(([productName, versions]) => {
           const isCollapsed = collapsed.has(productName);
           const selectedInGroup = versions.filter((version) => selected.has(version.id)).length;

@@ -50,11 +50,11 @@ export function FolderFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden rounded-md border-border bg-card p-0 sm:max-w-md" aria-describedby={undefined}>
-        <DialogHeader className="border-b border-border px-4 py-3">
-          <DialogTitle className="text-sm font-medium">{title}</DialogTitle>
+        <DialogHeader className="border-b border-border px-4 py-2">
+          <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-2 px-4 py-3">
+        <div className="space-y-2 px-4 py-2">
           <label htmlFor="folder-name-input" className="block text-sm font-normal text-foreground">
             Tên thư mục
           </label>
@@ -68,7 +68,7 @@ export function FolderFormDialog({
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
 
-        <DialogFooter className="px-4 pb-3 pt-1">
+        <DialogFooter className="px-4 pb-2 pt-1">
           <button
             type="button"
             onClick={() => onOpenChange(false)}

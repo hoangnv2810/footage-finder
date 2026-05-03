@@ -60,6 +60,11 @@ def sample_payload():
     }
 
 
+def create_folder(name="Loa"):
+    db.create_product_folder(name)
+    return next(folder for folder in db.list_product_folders() if folder["name"] == name)
+
+
 def sample_scene():
     return {
         "keyword": "demo",
@@ -100,6 +105,7 @@ def storyboard_request(version_id: str):
 
 def test_storyboard_generate_endpoint_saves_and_lists_project(temp_db, monkeypatch):
     version_id = seed_storyboard_version()
+    folder = create_folder()
 
     async def fake_generate_storyboard(product, script_text, candidate_versions):
         return {
@@ -121,12 +127,13 @@ def test_storyboard_generate_endpoint_saves_and_lists_project(temp_db, monkeypat
 
     monkeypatch.setattr(main, "generate_storyboard", fake_generate_storyboard)
 
-    response = client.post("/api/storyboards/generate", json=storyboard_request(version_id))
+    response = client.post("/api/storyboards/generate", json=storyboard_request(version_id) | {"folder_id": folder["id"]})
 
     assert response.status_code == 200
     saved = response.json()
     assert saved["id"].startswith("storyboard-")
     assert saved["source"] == "generated"
+    assert saved["folder"] == {"id": folder["id"], "name": "Loa", "isSystem": False}
     assert saved["productName"] == "Serum Vitamin C"
     assert saved["candidateSnapshot"][0]["candidate_id"] == f"{version_id}:0"
     assert saved["result"]["beats"][0]["id"] == "beat-1"
@@ -135,6 +142,7 @@ def test_storyboard_generate_endpoint_saves_and_lists_project(temp_db, monkeypat
     assert list_response.status_code == 200
     listed = list_response.json()["storyboards"]
     assert [item["id"] for item in listed] == [saved["id"]]
+    assert listed[0]["folder"]["name"] == "Loa"
     assert "result" not in listed[0]
 
     get_response = client.get(f"/api/storyboards/{saved['id']}")
@@ -204,18 +212,21 @@ def test_storyboard_delete_endpoint_removes_project(temp_db):
 
 
 def test_save_list_get_delete_storyboard(temp_db):
-    saved = db.save_storyboard_project(sample_payload())
+    folder = create_folder()
+    saved = db.save_storyboard_project(sample_payload() | {"folder_id": folder["id"]})
 
     assert saved["id"]
     assert saved["id"].startswith("storyboard-")
     assert saved["productName"] == "Serum Vitamin C"
     assert saved["source"] == "generated"
+    assert saved["folder"] == {"id": folder["id"], "name": "Loa", "isSystem": False}
     assert saved["beatCount"] == 1
     assert saved["result"]["beats"][0]["id"] == "beat-1"
 
     listed = db.list_storyboard_projects()
     assert [item["id"] for item in listed] == [saved["id"]]
     assert listed[0]["beatCount"] == 1
+    assert listed[0]["folder"]["name"] == "Loa"
     assert "result" not in listed[0]
 
     loaded = db.get_storyboard_project(saved["id"])
@@ -251,6 +262,7 @@ def test_init_db_migrates_old_storyboard_schema(temp_db):
     saved = db.save_storyboard_project(sample_payload())
 
     assert saved["source"] == "generated"
+    assert saved["folder"] is None
     assert saved["candidateSnapshot"][0]["candidate_id"] == "candidate-1"
     assert saved["result"]["beats"][0]["id"] == "beat-1"
 

@@ -66,6 +66,7 @@ function WorkspaceApp() {
   const [folderFormMode, setFolderFormMode] = useState<'create' | 'rename'>('create');
   const [folderTarget, setFolderTarget] = useState<ProductFolderSummary | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<ProductFolderSummary | null>(null);
+  const [selectedStoryboardFolderId, setSelectedStoryboardFolderId] = useState<number | null>(null);
   const [editVideoTarget, setEditVideoTarget] = useState<DatasetItem | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const playerRefs = useRef<Record<number, HTMLVideoElement | null>>({});
@@ -73,10 +74,10 @@ function WorkspaceApp() {
   const pendingSceneRef = useRef<Record<number, Scene | undefined>>({});
 
   const [storyboardProductName, setStoryboardProductName] = useState('');
-  const [storyboardCategory, setStoryboardCategory] = useState('');
+  const [storyboardGender, setStoryboardGender] = useState('');
   const [storyboardAudience, setStoryboardAudience] = useState('');
   const [storyboardTone, setStoryboardTone] = useState('');
-  const [storyboardBenefits, setStoryboardBenefits] = useState('');
+  const [storyboardRegion, setStoryboardRegion] = useState('');
   const [storyboardScript, setStoryboardScript] = useState('');
   const [storyboardSelectedVersionIds, setStoryboardSelectedVersionIds] = useState<string[]>([]);
   const [storyboardResult, setStoryboardResult] = useState<StoryboardResult | null>(null);
@@ -172,10 +173,10 @@ function WorkspaceApp() {
 
   const restoreSavedStoryboard = useCallback((saved: SavedStoryboard) => {
     setStoryboardProductName(saved.productName || '');
-    setStoryboardCategory(saved.category || '');
+    setStoryboardGender(saved.category || '');
     setStoryboardAudience(saved.targetAudience || '');
     setStoryboardTone(saved.tone || '');
-    setStoryboardBenefits(saved.keyBenefits || '');
+    setStoryboardRegion(saved.keyBenefits || '');
     setStoryboardScript(saved.scriptText || '');
     setStoryboardSelectedVersionIds(saved.selectedVersionIds || []);
     setStoryboardResult(saved.result || null);
@@ -249,6 +250,7 @@ function WorkspaceApp() {
       const result = await mutation();
       applyLibraryMutationResult(result);
       setGlobalError(null);
+      return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể cập nhật thư viện.';
       setGlobalError(message);
@@ -336,6 +338,7 @@ function WorkspaceApp() {
 
     return [{
       datasetId: dataset.datasetId,
+      folderId: dataset.folder?.id || dataset.primaryFolder?.id || null,
       fileName: dataset.fileName,
       productName: dataset.productName,
       versionId: version.id,
@@ -345,12 +348,39 @@ function WorkspaceApp() {
     }];
   }), [datasetItems]);
 
+  const activeDatasetFolder = activeDataset?.folder || activeDataset?.primaryFolder || null;
+  const selectedStoryboardFolder = folders.find((folder) => folder.id === selectedStoryboardFolderId) || null;
+  const storyboardFolder = selectedStoryboardFolder || activeDatasetFolder || null;
+  const currentStoryboardSources = useMemo(() => {
+    if (!storyboardFolder) return [];
+    return storyboardSources.filter((source) => source.folderId === storyboardFolder.id);
+  }, [storyboardFolder, storyboardSources]);
+  const currentSavedStoryboards = useMemo(() => {
+    if (!storyboardFolder) return savedStoryboards.filter((item) => !item.folder);
+    return savedStoryboards.filter((item) => item.folder?.id === storyboardFolder.id);
+  }, [savedStoryboards, storyboardFolder]);
+  const storyboardSourceSummary = useMemo(() => ({
+    videoCount: new Set(currentStoryboardSources.map((source) => source.datasetId)).size,
+    sceneCount: currentStoryboardSources.reduce((total, source) => total + source.sceneCount, 0),
+  }), [currentStoryboardSources]);
+  const storyboardFolders = useMemo(() => folders.map((folder) => {
+    const folderSources = storyboardSources.filter((source) => source.folderId === folder.id);
+    return {
+      folder,
+      sourceSummary: {
+        videoCount: new Set(folderSources.map((source) => source.datasetId)).size,
+        sceneCount: folderSources.reduce((total, source) => total + source.sceneCount, 0),
+      },
+      storyboardCount: savedStoryboards.filter((item) => item.folder?.id === folder.id).length,
+    };
+  }), [folders, savedStoryboards, storyboardSources]);
+
   const selectedStoryboardBeatMatches = storyboardResult?.beatMatches.find((group) => group.beatId === selectedStoryboardBeatId)?.matches || [];
   const resolvedStoryboardPreviewMatch = (storyboardPreviewMatch && selectedStoryboardBeatMatches.some((match) => match.id === storyboardPreviewMatch.id))
     ? storyboardPreviewMatch
     : null;
   const activeDatasetStoryboardVersionId = activeDataset?.versions?.[activeDataset.currentVersionIndex || 0]?.id || null;
-  const activeDatasetUsableForStoryboard = !!activeDatasetStoryboardVersionId && storyboardSources.some((source) => source.versionId === activeDatasetStoryboardVersionId);
+  const activeDatasetUsableForStoryboard = !!activeDatasetStoryboardVersionId && currentStoryboardSources.some((source) => source.versionId === activeDatasetStoryboardVersionId);
 
   useEffect(() => {
     const availableIds = filteredDatasets.map((dataset) => dataset.datasetId as string);
@@ -389,7 +419,7 @@ function WorkspaceApp() {
   useEffect(() => {
     const preferredVersionId = activeDatasetStoryboardVersionId;
     setStoryboardSelectedVersionIds((prev) => {
-      const availableIds = storyboardSources.map((source) => source.versionId);
+      const availableIds = currentStoryboardSources.map((source) => source.versionId);
       if (availableIds.length === 0) return [];
 
       const filtered = prev.filter((id) => availableIds.includes(id));
@@ -402,7 +432,7 @@ function WorkspaceApp() {
       if (activeDataset) return [];
       return [];
     });
-  }, [activeDataset, activeDatasetStoryboardVersionId, storyboardSources]);
+  }, [activeDataset, activeDatasetStoryboardVersionId, currentStoryboardSources]);
 
   useEffect(() => {
     if (!storyboardResult || storyboardResult.beats.length === 0) {
@@ -644,12 +674,16 @@ function WorkspaceApp() {
 
   const generateStoryboard = async () => {
     const scriptText = storyboardScript.trim();
+    if (!storyboardFolder) {
+      toast.error('Vui lòng chọn folder sản phẩm trước khi tạo storyboard.');
+      return;
+    }
     if (!scriptText) {
       toast.error('Vui lòng nhập kịch bản để tạo storyboard.');
       return;
     }
 
-    if (storyboardSources.length === 0) {
+    if (currentStoryboardSources.length === 0) {
       toast.error('Cần có ít nhất một video đã phân tích để tạo storyboard.');
       return;
     }
@@ -661,12 +695,13 @@ function WorkspaceApp() {
     try {
       const saved = await api.generateSavedStoryboard({
         product_name: storyboardProductName.trim(),
-        category: storyboardCategory.trim(),
+        category: storyboardGender.trim(),
         target_audience: storyboardAudience.trim(),
         tone: storyboardTone.trim(),
-        key_benefits: storyboardBenefits.trim(),
+        key_benefits: storyboardRegion.trim(),
         script_text: scriptText,
         selected_version_ids: storyboardSelectedVersionIds,
+        folder_id: storyboardFolder.id,
       });
 
       upsertSavedStoryboard(saved);
@@ -680,10 +715,10 @@ function WorkspaceApp() {
 
   const getStoryboardProductInput = (): StoryboardProductInput => ({
     product_name: storyboardProductName.trim(),
-    category: storyboardCategory.trim(),
+    category: storyboardGender.trim(),
     target_audience: storyboardAudience.trim(),
     tone: storyboardTone.trim(),
-    key_benefits: storyboardBenefits.trim(),
+    key_benefits: storyboardRegion.trim(),
   });
 
   const buildSelectedStoryboardCandidates = (): StoryboardCandidateScene[] => {
@@ -712,6 +747,10 @@ function WorkspaceApp() {
 
   const copyStoryboardInput = async () => {
     const scriptText = storyboardScript.trim();
+    if (!storyboardFolder) {
+      toast.error('Vui lòng chọn folder sản phẩm trước khi copy input.');
+      return;
+    }
     if (!scriptText) {
       toast.error('Vui lòng nhập kịch bản trước khi copy input.');
       return;
@@ -743,6 +782,10 @@ function WorkspaceApp() {
 
   const importStoryboard = async (rawJson: string) => {
     const scriptText = storyboardScript.trim();
+    if (!storyboardFolder) {
+      toast.error('Vui lòng chọn folder sản phẩm trước khi import storyboard.');
+      throw new Error('Vui lòng chọn folder sản phẩm trước khi import storyboard.');
+    }
     if (!scriptText) {
       toast.error('Vui lòng nhập kịch bản trước khi import storyboard.');
       throw new Error('Vui lòng nhập kịch bản trước khi import storyboard.');
@@ -769,6 +812,7 @@ function WorkspaceApp() {
         ...getStoryboardProductInput(),
         script_text: scriptText,
         selected_version_ids: storyboardSelectedVersionIds,
+        folder_id: storyboardFolder.id,
         result_json: resultJson,
       });
       upsertSavedStoryboard(saved);
@@ -1065,7 +1109,12 @@ function WorkspaceApp() {
 
   const submitFolderForm = async (name: string) => {
     if (folderFormMode === 'create') {
-      await runLibraryMutation(() => api.createProductFolder({ name }));
+      const normalizedName = name.trim();
+      const result = await runLibraryMutation(() => api.createProductFolder({ name: normalizedName }));
+      const createdFolder = result.folders.find((folder) => folder.name === normalizedName) || null;
+      if (createdFolder) {
+        setSelectedStoryboardFolderId(createdFolder.id);
+      }
       return;
     }
     if (!folderTarget) {
@@ -1153,7 +1202,7 @@ function WorkspaceApp() {
   );
 
   return (
-    <AppLayout>
+    <AppLayout onCreateStoryboardFolder={openCreateFolderDialog}>
       <Routes>
         <Route
           path="/"
@@ -1233,16 +1282,19 @@ function WorkspaceApp() {
           path="/storyboard"
           element={renderPage(
             <StoryboardPage
+              storyboardFolder={storyboardFolder}
+              storyboardFolders={storyboardFolders}
+              storyboardSourceSummary={storyboardSourceSummary}
               storyboardProductName={storyboardProductName}
-              storyboardCategory={storyboardCategory}
+              storyboardGender={storyboardGender}
               storyboardAudience={storyboardAudience}
               storyboardTone={storyboardTone}
-              storyboardBenefits={storyboardBenefits}
+              storyboardRegion={storyboardRegion}
               storyboardScript={storyboardScript}
               storyboardSelectedVersionIds={storyboardSelectedVersionIds}
-              storyboardSources={storyboardSources}
+              storyboardSources={currentStoryboardSources}
               storyboardResult={storyboardResult}
-              savedStoryboards={savedStoryboards}
+              savedStoryboards={currentSavedStoryboards}
               selectedSavedStoryboardId={selectedSavedStoryboardId}
               selectedStoryboardBeatId={selectedStoryboardBeatId}
               storyboardPreviewMatch={resolvedStoryboardPreviewMatch}
@@ -1250,11 +1302,14 @@ function WorkspaceApp() {
               activeDataset={activeDataset}
               activeDatasetUsableForStoryboard={activeDatasetUsableForStoryboard}
               trimmingScene={trimmingScene}
+              onRenameStoryboardFolder={openRenameFolderDialog}
+              onDeleteStoryboardFolder={openDeleteFolderDialog}
+              onSelectStoryboardFolder={setSelectedStoryboardFolderId}
               onStoryboardProductNameChange={setStoryboardProductName}
-              onStoryboardCategoryChange={setStoryboardCategory}
+              onStoryboardGenderChange={setStoryboardGender}
               onStoryboardAudienceChange={setStoryboardAudience}
               onStoryboardToneChange={setStoryboardTone}
-              onStoryboardBenefitsChange={setStoryboardBenefits}
+              onStoryboardRegionChange={setStoryboardRegion}
               onStoryboardScriptChange={setStoryboardScript}
               onCopyInput={() => {
                 void copyStoryboardInput();

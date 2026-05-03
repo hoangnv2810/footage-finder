@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { ProductFolderSummary } from '@/lib/footage-app';
 
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertTriangle } from 'lucide-react';
 
 interface DeleteFolderDialogProps {
   open: boolean;
@@ -45,25 +46,28 @@ export function DeleteFolderDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden rounded-md border-border bg-card p-0 sm:max-w-lg" aria-describedby={undefined}>
-        <DialogHeader className="border-b border-border px-4 py-3">
-          <DialogTitle className="text-sm font-medium">Xóa thư mục</DialogTitle>
+        <DialogHeader className="border-b border-border px-4 py-2">
+          <DialogTitle className="text-base font-semibold">Xóa thư mục</DialogTitle>
         </DialogHeader>
 
         {folder ? (
-          <div className="space-y-3 px-4 py-3 text-sm">
+          <div className="space-y-2 px-4 py-2 text-sm">
             <p className="text-foreground">
               Bạn muốn xóa thư mục <span className="font-semibold">{folder.name}</span>?
             </p>
 
-            <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-foreground">
-              Tất cả video trong thư mục này sẽ được chuyển về thư mục hệ thống <span className="font-medium">Chưa phân loại</span>.
+            <div className="flex items-start gap-2 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-500">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Tất cả video trong thư mục này sẽ được chuyển về thư mục hệ thống <span className="font-medium">Chưa phân loại</span>.
+              </p>
             </div>
 
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
           </div>
         ) : null}
 
-        <DialogFooter className="px-4 pb-3 pt-1">
+        <DialogFooter className="px-4 pb-2 pt-1">
           <button
             type="button"
             onClick={() => onOpenChange(false)}

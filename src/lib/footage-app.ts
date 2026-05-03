@@ -151,6 +151,7 @@ export interface StoryboardResult {
 
 export interface StoryboardSource {
   datasetId: string;
+  folderId?: number | null;
   fileName: string;
   productName: string;
   versionId: string;
@@ -188,6 +189,7 @@ export interface StoryboardProductInput {
 export interface StoryboardGeneratePayload extends StoryboardProductInput {
   script_text: string;
   selected_version_ids: string[];
+  folder_id?: number | null;
 }
 
 export interface StoryboardImportPayload extends StoryboardGeneratePayload {
@@ -207,6 +209,7 @@ export interface SavedStoryboard {
   selectedVersionIds: string[];
   candidateSnapshot: StoryboardCandidateScene[];
   source: 'generated' | 'imported';
+  folder?: ProductFolderSummary | null;
   beatCount: number;
   result?: StoryboardResult;
 }
