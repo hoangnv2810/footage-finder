@@ -336,7 +336,8 @@ function WorkspaceApp() {
   );
 
   const storyboardSources = useMemo(() => datasetItems.flatMap((dataset) => {
-    const version = dataset.versions?.[dataset.currentVersionIndex || 0];
+    const versionIndex = dataset.currentVersionIndex || 0;
+    const version = dataset.versions?.[versionIndex];
     if (!version || version.scenes.length === 0) return [];
 
     return [{
@@ -345,6 +346,7 @@ function WorkspaceApp() {
       fileName: dataset.fileName,
       productName: dataset.productName,
       versionId: version.id,
+      versionNumber: versionIndex + 1,
       sceneCount: version.scenes.length,
       timestamp: version.timestamp,
       source: dataset.source,

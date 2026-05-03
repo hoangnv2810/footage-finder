@@ -63,6 +63,27 @@ const beat: StoryboardBeatView = {
 };
 
 describe('StoryboardPreviewPanel', () => {
+  it('omits preview and match section headings while keeping fixed-width beat number badge', () => {
+    render(
+      <StoryboardPreviewPanel
+        beat={{
+          ...beat,
+          text: 'Một nội dung beat rất dài để kiểm tra badge số thứ tự không bị co ngang khi phần mô tả chiếm nhiều chiều rộng.',
+        }}
+        previewMatch={match}
+        trimmingSceneId={null}
+        onPreviewMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onPlayerRef={vi.fn()}
+        onTimeUpdate={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('Preview video')).not.toBeInTheDocument();
+    expect(screen.queryByText('Footage match (1)')).not.toBeInTheDocument();
+    expect(screen.getByText('1')).toHaveClass('shrink-0');
+  });
+
   it('loads the preview video without a media-fragment seek so JS owns positioning', () => {
     // The browser auto-seek triggered by a `#t=start,end` fragment used to race
     // our explicit JS seek and let the player play from second 0 on Chromium.

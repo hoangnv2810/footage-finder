@@ -180,6 +180,7 @@ describe('StoryboardPage', () => {
             fileName: 'loa.mp4',
             productName: 'Loa',
             versionId: 'v1',
+            versionNumber: 1,
             sceneCount: 4,
             timestamp: Date.UTC(2026, 3, 19, 10, 30),
             source: 'web',
@@ -220,6 +221,190 @@ describe('StoryboardPage', () => {
 
     expect(screen.getByRole('button', { name: 'Tạo storyboard' }).closest('.custom-scrollbar')).toBeNull();
     expect(container.querySelector('.custom-scrollbar .custom-scrollbar')).toBeNull();
+  });
+
+  it('orders expanded folder content as source, info, saved storyboards, then import actions', () => {
+    render(
+      <StoryboardPage
+        storyboardFolder={{ id: 12, name: 'Loa', isSystem: false }}
+        storyboardFolders={[
+          { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 1 },
+        ]}
+        storyboardSourceSummary={{ videoCount: 1, sceneCount: 4 }}
+        storyboardProductDescription="Mô tả sản phẩm"
+        storyboardProductName="Loa"
+        storyboardGender="Audio"
+        storyboardAudience=""
+        storyboardTone=""
+        storyboardRegion=""
+        storyboardScript="Hook"
+        storyboardSelectedVersionIds={[]}
+        storyboardSources={[]}
+        storyboardResult={null}
+        savedStoryboards={[]}
+        selectedSavedStoryboardId={null}
+        selectedStoryboardBeatId={null}
+        storyboardPreviewMatch={null}
+        isGeneratingStoryboard={false}
+        activeDataset={null}
+        activeDatasetUsableForStoryboard
+        trimmingScene={null}
+        onRenameStoryboardFolder={vi.fn()}
+        onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
+        onStoryboardProductNameChange={vi.fn()}
+        onStoryboardGenderChange={vi.fn()}
+        onStoryboardAudienceChange={vi.fn()}
+        onStoryboardToneChange={vi.fn()}
+        onStoryboardRegionChange={vi.fn()}
+        onStoryboardScriptChange={vi.fn()}
+        onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={vi.fn()}
+        onToggleSourceVersion={vi.fn()}
+        onGenerateStoryboard={vi.fn()}
+        onSelectBeat={vi.fn()}
+        onPlayStoryboardMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onStoryboardPlayerRef={vi.fn()}
+        onStoryboardTimeUpdate={vi.fn()}
+      />,
+    );
+
+    const source = screen.getByText('Nguồn dữ liệu');
+    const info = screen.getByText('Thông tin & Kịch bản');
+    const saved = screen.getByText('Storyboard đã lưu');
+    const copy = screen.getByRole('button', { name: 'Copy input' });
+    const importButton = screen.getByRole('button', { name: 'Import storyboard' });
+
+    expect(source.compareDocumentPosition(info) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(info.compareDocumentPosition(saved) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(saved.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(copy.compareDocumentPosition(importButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('lets the source data section shrink to content when source groups collapse', () => {
+    render(
+      <StoryboardPage
+        storyboardFolder={{ id: 12, name: 'Loa', isSystem: false }}
+        storyboardFolders={[
+          { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 0 },
+        ]}
+        storyboardSourceSummary={{ videoCount: 1, sceneCount: 4 }}
+        storyboardProductDescription="Mô tả sản phẩm"
+        storyboardProductName="Loa"
+        storyboardGender="Audio"
+        storyboardAudience=""
+        storyboardTone=""
+        storyboardRegion=""
+        storyboardScript="Hook"
+        storyboardSelectedVersionIds={[]}
+        storyboardSources={[]}
+        storyboardResult={null}
+        savedStoryboards={[]}
+        selectedSavedStoryboardId={null}
+        selectedStoryboardBeatId={null}
+        storyboardPreviewMatch={null}
+        isGeneratingStoryboard={false}
+        activeDataset={null}
+        activeDatasetUsableForStoryboard
+        trimmingScene={null}
+        onRenameStoryboardFolder={vi.fn()}
+        onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
+        onStoryboardProductNameChange={vi.fn()}
+        onStoryboardGenderChange={vi.fn()}
+        onStoryboardAudienceChange={vi.fn()}
+        onStoryboardToneChange={vi.fn()}
+        onStoryboardRegionChange={vi.fn()}
+        onStoryboardScriptChange={vi.fn()}
+        onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={vi.fn()}
+        onToggleSourceVersion={vi.fn()}
+        onGenerateStoryboard={vi.fn()}
+        onSelectBeat={vi.fn()}
+        onPlayStoryboardMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onStoryboardPlayerRef={vi.fn()}
+        onStoryboardTimeUpdate={vi.fn()}
+      />,
+    );
+
+    const sourceSection = screen.getByText('Nguồn dữ liệu').closest('[data-testid="storyboard-source-section"]');
+
+    expect(sourceSection).toBeInTheDocument();
+    expect(sourceSection).not.toHaveClass('min-h-[220px]', 'flex', 'flex-col');
+  });
+
+  it('uses the explicit storyboard source version number instead of parsing the random version id', () => {
+    render(
+      <StoryboardPage
+        storyboardFolder={{ id: 12, name: 'Loa', isSystem: false }}
+        storyboardFolders={[
+          { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 0 },
+        ]}
+        storyboardSourceSummary={{ videoCount: 1, sceneCount: 4 }}
+        storyboardProductDescription="Mô tả sản phẩm"
+        storyboardProductName="Loa"
+        storyboardGender="Audio"
+        storyboardAudience=""
+        storyboardTone=""
+        storyboardRegion=""
+        storyboardScript="Hook"
+        storyboardSelectedVersionIds={['version:abc987654321']}
+        storyboardSources={[
+          {
+            datasetId: 'video-1',
+            folderId: 12,
+            fileName: 'loa.mp4',
+            productName: 'Loa',
+            versionId: 'version:abc987654321',
+            versionNumber: 2,
+            sceneCount: 4,
+            timestamp: Date.UTC(2026, 3, 19, 10, 30),
+            source: 'web',
+          },
+        ]}
+        storyboardResult={null}
+        savedStoryboards={[]}
+        selectedSavedStoryboardId={null}
+        selectedStoryboardBeatId={null}
+        storyboardPreviewMatch={null}
+        isGeneratingStoryboard={false}
+        activeDataset={null}
+        activeDatasetUsableForStoryboard
+        trimmingScene={null}
+        onRenameStoryboardFolder={vi.fn()}
+        onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
+        onStoryboardProductNameChange={vi.fn()}
+        onStoryboardGenderChange={vi.fn()}
+        onStoryboardAudienceChange={vi.fn()}
+        onStoryboardToneChange={vi.fn()}
+        onStoryboardRegionChange={vi.fn()}
+        onStoryboardScriptChange={vi.fn()}
+        onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={vi.fn()}
+        onToggleSourceVersion={vi.fn()}
+        onGenerateStoryboard={vi.fn()}
+        onSelectBeat={vi.fn()}
+        onPlayStoryboardMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onStoryboardPlayerRef={vi.fn()}
+        onStoryboardTimeUpdate={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('v2')).toBeInTheDocument();
+    expect(screen.queryByText('v987654321')).not.toBeInTheDocument();
   });
 
   it('collapses the active folder when clicking its header again', () => {
@@ -340,6 +525,124 @@ describe('StoryboardPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Sửa/ }));
 
     expect(onRenameStoryboardFolder).toHaveBeenCalledWith(folder);
+  });
+
+  it('keeps the folder expand chevron vertically centered in the header row', () => {
+    const folder = { id: 12, name: 'Loa', isSystem: false };
+
+    render(
+      <StoryboardPage
+        storyboardFolder={folder}
+        storyboardFolders={[
+          { folder, sourceSummary: { videoCount: 2, sceneCount: 12 }, storyboardCount: 0 },
+        ]}
+        storyboardSourceSummary={{ videoCount: 2, sceneCount: 12 }}
+        storyboardProductDescription="Mô tả sản phẩm"
+        storyboardProductName="Loa"
+        storyboardGender="Audio"
+        storyboardAudience=""
+        storyboardTone=""
+        storyboardRegion=""
+        storyboardScript="Hook"
+        storyboardSelectedVersionIds={[]}
+        storyboardSources={[]}
+        storyboardResult={null}
+        savedStoryboards={[]}
+        selectedSavedStoryboardId={null}
+        selectedStoryboardBeatId={null}
+        storyboardPreviewMatch={null}
+        isGeneratingStoryboard={false}
+        activeDataset={null}
+        activeDatasetUsableForStoryboard
+        trimmingScene={null}
+        onRenameStoryboardFolder={vi.fn()}
+        onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
+        onStoryboardProductNameChange={vi.fn()}
+        onStoryboardGenderChange={vi.fn()}
+        onStoryboardAudienceChange={vi.fn()}
+        onStoryboardToneChange={vi.fn()}
+        onStoryboardRegionChange={vi.fn()}
+        onStoryboardScriptChange={vi.fn()}
+        onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={vi.fn()}
+        onToggleSourceVersion={vi.fn()}
+        onGenerateStoryboard={vi.fn()}
+        onSelectBeat={vi.fn()}
+        onPlayStoryboardMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onStoryboardPlayerRef={vi.fn()}
+        onStoryboardTimeUpdate={vi.fn()}
+      />,
+    );
+
+    const folderButton = screen.getByRole('button', { name: /Loa 2 video · 12 cảnh · 0 storyboard/ });
+    expect(folderButton).toHaveClass('items-center');
+
+    const chevron = folderButton.querySelector('svg');
+    expect(chevron).toHaveClass('h-4', 'w-4', 'shrink-0', 'text-muted-foreground');
+    expect(chevron).not.toHaveClass('mt-0.5');
+
+    const summary = screen.getByText('2 video · 12 cảnh · 0 storyboard');
+    expect(summary).toHaveClass('text-xs', 'font-medium');
+    expect(summary).not.toHaveClass('text-[11px]');
+  });
+
+  it('uses the product folder title typography scale', () => {
+    render(
+      <StoryboardPage
+        storyboardFolder={{ id: 12, name: 'Loa', isSystem: false }}
+        storyboardFolders={[
+          { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 2, sceneCount: 12 }, storyboardCount: 0 },
+        ]}
+        storyboardSourceSummary={{ videoCount: 2, sceneCount: 12 }}
+        storyboardProductDescription="Mô tả sản phẩm"
+        storyboardProductName="Loa"
+        storyboardGender="Audio"
+        storyboardAudience=""
+        storyboardTone=""
+        storyboardRegion=""
+        storyboardScript="Hook"
+        storyboardSelectedVersionIds={[]}
+        storyboardSources={[]}
+        storyboardResult={null}
+        savedStoryboards={[]}
+        selectedSavedStoryboardId={null}
+        selectedStoryboardBeatId={null}
+        storyboardPreviewMatch={null}
+        isGeneratingStoryboard={false}
+        activeDataset={null}
+        activeDatasetUsableForStoryboard
+        trimmingScene={null}
+        onRenameStoryboardFolder={vi.fn()}
+        onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
+        onStoryboardProductNameChange={vi.fn()}
+        onStoryboardGenderChange={vi.fn()}
+        onStoryboardAudienceChange={vi.fn()}
+        onStoryboardToneChange={vi.fn()}
+        onStoryboardRegionChange={vi.fn()}
+        onStoryboardScriptChange={vi.fn()}
+        onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={vi.fn()}
+        onToggleSourceVersion={vi.fn()}
+        onGenerateStoryboard={vi.fn()}
+        onSelectBeat={vi.fn()}
+        onPlayStoryboardMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onStoryboardPlayerRef={vi.fn()}
+        onStoryboardTimeUpdate={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Loa' })).toHaveClass('text-[15px]', 'font-semibold');
+    expect(screen.getByText('Nguồn dữ liệu')).toHaveClass('text-[13px]', 'font-semibold');
   });
 
   it('opens folder delete from the three-dot menu in the folder header', () => {

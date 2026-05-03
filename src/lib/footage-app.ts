@@ -155,6 +155,7 @@ export interface StoryboardSource {
   fileName: string;
   productName: string;
   versionId: string;
+  versionNumber: number;
   sceneCount: number;
   timestamp: number;
   source: DatasetSource;

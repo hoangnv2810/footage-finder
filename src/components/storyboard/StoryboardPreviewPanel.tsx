@@ -29,7 +29,7 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
     <div className="mx-auto flex h-full min-h-0 w-full max-w-[1100px] flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+          <span className="w-6 h-6 shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
             {beat.number}
           </span>
           <div>
@@ -48,11 +48,7 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
         <div className="grid h-full min-h-0 grid-cols-[minmax(360px,44%)_minmax(340px,56%)] overflow-hidden">
           <div className="min-h-0 border-r border-border bg-card/30">
-            <div className="px-4 py-3 border-b border-border shrink-0">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Preview video</h4>
-            </div>
-
-            <div className="flex h-[calc(100%-41px)] min-h-0 items-center justify-center p-4 overflow-hidden">
+            <div className="flex h-full min-h-0 items-center justify-center p-4 overflow-hidden">
               {previewMatch ? (
                 <div className="rounded-lg bg-black/40 overflow-hidden w-full max-w-[360px]">
                   <video
@@ -75,13 +71,7 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
           </div>
 
           <div className="min-h-0 overflow-hidden">
-            <div className="px-4 py-3 border-b border-border shrink-0">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Footage match ({beat.matches.length})
-              </h4>
-            </div>
-
-            <div className="h-[calc(100%-41px)] min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-4 space-y-2 custom-scrollbar">
+            <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-4 space-y-2 custom-scrollbar">
               {beat.matches.length > 0 ? (
                 beat.matches.map((match) => (
                   <StoryboardMatchCard

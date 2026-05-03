@@ -5,6 +5,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppLayout } from './AppLayout';
 
 describe('AppLayout', () => {
+  it('collapses the left navigation sidebar by default without hiding page content', () => {
+    render(
+      <MemoryRouter initialEntries={['/storyboard']}>
+        <AppLayout>
+          <div>Storyboard content</div>
+        </AppLayout>
+      </MemoryRouter>,
+    );
+
+    const sidebar = screen.getByRole('navigation').closest('aside');
+
+    expect(sidebar).toHaveClass('w-[64px]');
+    expect(screen.getByText('Storyboard content')).toBeInTheDocument();
+  });
+
   it('shows create product folder action in the top header on storyboard page', () => {
     const onCreateStoryboardFolder = vi.fn();
 

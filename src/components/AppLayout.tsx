@@ -12,7 +12,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, onCreateStoryboardFolder }: AppLayoutProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const location = useLocation();
   const showStoryboardFolderAction = location.pathname.startsWith('/storyboard') && !!onCreateStoryboardFolder;
 

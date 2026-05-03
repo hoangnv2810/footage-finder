@@ -146,9 +146,6 @@ export function StoryboardInputPanel({
   const [rawJson, setRawJson] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<SavedStoryboard | null>(null);
 
-  const filledFields = [productName, productDescription, gender, audience, tone, region].filter(Boolean).length;
-  const scriptLines = script.trim() ? script.trim().split('\n').length : 0;
-
   const submitImport = async () => {
     try {
       await onImportStoryboard(rawJson);
@@ -163,11 +160,7 @@ export function StoryboardInputPanel({
     <div>
       <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-bold text-white">Thông tin & Kịch bản</h4>
-          <p className="text-xs text-foreground truncate mt-0.5">
-            {productName || 'Chưa nhập sản phẩm'}
-            <span className="text-muted-foreground"> · {filledFields}/6 trường · {scriptLines} dòng kịch bản</span>
-          </p>
+          <h4 className="text-[13px] font-semibold text-white">Thông tin & Kịch bản</h4>
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
@@ -354,45 +347,8 @@ export function StoryboardInputPanel({
         </Dialog>
       </div>
       <div className="space-y-3 px-3 py-3">
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={onCopyInput} className="rounded-md bg-secondary px-2 py-2 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
-            Copy input
-          </button>
-          <Dialog open={importOpen} onOpenChange={setImportOpen}>
-            <DialogTrigger asChild>
-              <button className="rounded-md bg-secondary px-2 py-2 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
-                Import storyboard JSON
-              </button>
-            </DialogTrigger>
-            <DialogContent className="rounded-md border-border bg-card p-0 sm:max-w-2xl">
-              <DialogHeader className="border-b border-border px-4 py-2">
-                <DialogTitle className="text-base font-semibold">Import storyboard JSON</DialogTitle>
-                <DialogDescription>Dán JSON storyboard đã tạo từ GPT hoặc Claude để lưu và hiển thị trong phần mềm.</DialogDescription>
-              </DialogHeader>
-              <div className="px-4 py-2">
-                <label className="mb-1 block text-sm font-normal text-foreground" htmlFor="storyboard-import-json">JSON storyboard</label>
-                <textarea
-                  id="storyboard-import-json"
-                  value={rawJson}
-                  onChange={(e) => setRawJson(e.target.value)}
-                  className="h-56 w-full resize-none rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none custom-scrollbar"
-                  placeholder='{"beats":[],"beatMatches":[]}'
-                />
-              </div>
-              <DialogFooter className="px-4 pb-2 pt-1">
-                <button onClick={() => setImportOpen(false)} className="rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
-                  Hủy
-                </button>
-                <button onClick={submitImport} disabled={isImportingStoryboard || !rawJson.trim()} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40">
-                  {isImportingStoryboard ? 'Đang nhập...' : 'Nhập JSON'}
-                </button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-
         <section className="space-y-2">
-          <h4 className="text-xs font-semibold text-secondary-foreground">Storyboard đã lưu</h4>
+          <h4 className="text-[13px] font-semibold text-white">Storyboard đã lưu</h4>
           {savedStoryboards.length === 0 ? (
             <p className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">Chưa có storyboard đã lưu.</p>
           ) : (
@@ -420,6 +376,42 @@ export function StoryboardInputPanel({
             </div>
           )}
         </section>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onCopyInput} className="rounded-md bg-secondary px-2 py-2 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
+            Copy input
+          </button>
+          <Dialog open={importOpen} onOpenChange={setImportOpen}>
+            <DialogTrigger asChild>
+              <button className="rounded-md bg-secondary px-2 py-2 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
+                Import storyboard
+              </button>
+            </DialogTrigger>
+            <DialogContent aria-describedby={undefined} className="rounded-md border-border bg-card p-0 sm:max-w-2xl">
+              <DialogHeader className="border-b border-border px-4 py-2">
+                <DialogTitle className="text-base font-semibold">Import storyboard</DialogTitle>
+              </DialogHeader>
+              <div className="px-4 py-2">
+                <label className="mb-1 block text-sm font-normal text-foreground" htmlFor="storyboard-import-json">JSON storyboard</label>
+                <textarea
+                  id="storyboard-import-json"
+                  value={rawJson}
+                  onChange={(e) => setRawJson(e.target.value)}
+                  className="h-56 w-full resize-none rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none custom-scrollbar"
+                  placeholder='{"beats":[],"beatMatches":[]}'
+                />
+              </div>
+              <DialogFooter className="px-4 pb-2 pt-1">
+                <button onClick={() => setImportOpen(false)} className="rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
+                  Hủy
+                </button>
+                <button onClick={submitImport} disabled={isImportingStoryboard || !rawJson.trim()} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40">
+                  {isImportingStoryboard ? 'Đang nhập...' : 'Nhập JSON'}
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Dialog open={!!deleteTarget} onOpenChange={(nextOpen) => !nextOpen && setDeleteTarget(null)}>

@@ -153,7 +153,7 @@ export function StoryboardPage({
               const summary = `${row.sourceSummary.videoCount} video · ${row.sourceSummary.sceneCount} cảnh · ${row.storyboardCount} storyboard`;
               return (
                 <div key={row.folder.id} className="border-b border-border/60 last:border-b-0">
-                  <div className={`flex items-start gap-1 px-3 py-2.5 transition-colors ${isActive ? 'bg-primary/5' : 'hover:bg-surface-hover'}`}>
+                  <div className={`flex items-center gap-1 px-3 py-2.5 transition-colors ${isActive ? 'bg-primary/5' : 'hover:bg-surface-hover'}`}>
                     <button
                       type="button"
                       onClick={() => {
@@ -165,12 +165,12 @@ export function StoryboardPage({
                         setExpandedFolderId(row.folder.id);
                         if (!isActive) onSelectStoryboardFolder(row.folder.id);
                       }}
-                      className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
                     >
-                      {isExpanded ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                      {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                       <span className="min-w-0 flex-1">
-                        <h2 className="block truncate text-sm font-bold text-white">{row.folder.name}</h2>
-                        <span className="mt-0.5 block text-[11px] text-muted-foreground">{summary}</span>
+                        <h2 className="block truncate text-[15px] font-semibold text-white">{row.folder.name}</h2>
+                        <span className="mt-0.5 block text-xs font-medium text-muted-foreground">{summary}</span>
                       </span>
                     </button>
                     {!row.folder.isSystem ? (
@@ -223,6 +223,26 @@ export function StoryboardPage({
                   </div>
                   {isExpanded ? (
                     <div className="border-t border-border/50">
+                      <div data-testid="storyboard-source-section" className="overflow-hidden">
+                        {activeDataset && !activeDatasetUsableForStoryboard ? (
+                          <div className="mx-3 mt-3 rounded-md border border-badge-web/30 bg-badge-web/10 px-3 py-2 text-xs text-badge-web">
+                            Dataset đang chọn chưa có version usable cho storyboard.
+                          </div>
+                        ) : null}
+                        <div className="border-b border-border px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[13px] font-semibold text-white">Nguồn dữ liệu</span>
+                            <span className="text-[11px] text-muted-foreground">{storyboardSourceSummary.videoCount} video · {storyboardSourceSummary.sceneCount} cảnh</span>
+                          </div>
+                        </div>
+                        <StoryboardSourcePicker
+                          sources={sourceViews}
+                          selected={new Set(storyboardSelectedVersionIds)}
+                          onToggle={(id) => onToggleSourceVersion(id, !storyboardSelectedVersionIds.includes(id))}
+                          hideHeader
+                          disableInternalScroll
+                        />
+                      </div>
                       <StoryboardInputPanel
                         productName={storyboardProductName}
                         setProductName={onStoryboardProductNameChange}
@@ -248,26 +268,6 @@ export function StoryboardPage({
                         onDeleteSavedStoryboard={onDeleteSavedStoryboard}
                         isImportingStoryboard={isGeneratingStoryboard}
                       />
-                      <div className="min-h-[220px] flex flex-col overflow-hidden">
-                        {activeDataset && !activeDatasetUsableForStoryboard ? (
-                          <div className="mx-3 mt-3 rounded-md border border-badge-web/30 bg-badge-web/10 px-3 py-2 text-xs text-badge-web">
-                            Dataset đang chọn chưa có version usable cho storyboard.
-                          </div>
-                        ) : null}
-                        <div className="border-b border-border px-3 py-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-bold text-white">Nguồn dữ liệu</span>
-                            <span className="text-[11px] text-muted-foreground">{storyboardSourceSummary.videoCount} video · {storyboardSourceSummary.sceneCount} cảnh</span>
-                          </div>
-                        </div>
-                        <StoryboardSourcePicker
-                          sources={sourceViews}
-                          selected={new Set(storyboardSelectedVersionIds)}
-                          onToggle={(id) => onToggleSourceVersion(id, !storyboardSelectedVersionIds.includes(id))}
-                          hideHeader
-                          disableInternalScroll
-                        />
-                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -317,7 +317,7 @@ function toSourceView(source: StoryboardSource): SourceVersionView {
     videoFileName: source.fileName,
     productName: source.productName,
     source: source.source === 'extension' ? 'Extension' : 'Web',
-    version: parseVersionNumber(source.versionId),
+    version: source.versionNumber,
     sceneCount: source.sceneCount,
     usable: source.sceneCount > 0,
   };
@@ -349,11 +349,6 @@ function toBeatMatchView(match: StoryboardMatch): BeatMatchView {
     shotType: match.scene.shot_type || '',
     rawMatch: match,
   };
-}
-
-function parseVersionNumber(versionId: string) {
-  const match = versionId.match(/(\d+)$/);
-  return match ? parseInt(match[1], 10) : 1;
 }
 
 function toTrimMatchId(beat: StoryboardBeatView | null, previewMatchId: string | null, trimmingScene: string | null) {

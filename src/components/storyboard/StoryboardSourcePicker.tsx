@@ -38,7 +38,7 @@ export function StoryboardSourcePicker({ sources, selected, onToggle, hideHeader
   };
 
   return (
-    <div className={cn('flex flex-col min-h-0', disableInternalScroll ? '' : 'h-full overflow-hidden')}>
+    <div className={cn(disableInternalScroll ? '' : 'flex flex-col min-h-0 h-full overflow-hidden')}>
       {!hideHeader ? (
         <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
           <span className="text-sm font-bold text-white">Nguồn dữ liệu</span>
