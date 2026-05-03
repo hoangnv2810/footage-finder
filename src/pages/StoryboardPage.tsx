@@ -10,13 +10,9 @@ import type { BeatMatchView, SourceVersionView, StoryboardBeatView } from '@/com
 import type { DatasetItem, ProductFolderSummary, SavedStoryboard, StoryboardMatch, StoryboardResult, StoryboardSource } from '@/lib/footage-app';
 
 interface StoryboardPageProps {
-  storyboardFolder: ProductFolderSummary | null;
-  storyboardFolders: Array<{
-    folder: ProductFolderSummary;
-    sourceSummary: { videoCount: number; sceneCount: number };
-    storyboardCount: number;
-  }>;
-  storyboardSourceSummary: { videoCount: number; sceneCount: number };
+  storyboardFolder: DatasetFolder;
+  storyboardFolders: { folder: DatasetFolder; sourceSummary: StoryboardSourceSummary; storyboardCount: number }[];
+  storyboardSourceSummary: StoryboardSourceSummary;
   storyboardProductName: string;
   storyboardProductDescription: string;
   storyboardGender: string;
@@ -32,16 +28,19 @@ interface StoryboardPageProps {
   selectedStoryboardBeatId: string | null;
   storyboardPreviewMatch: StoryboardMatch | null;
   isGeneratingStoryboard: boolean;
-  activeDataset: DatasetItem | null;
+  activeDataset: ExtendedDataset | null;
   activeDatasetUsableForStoryboard: boolean;
-  trimmingScene: string | null;
-  onStoryboardProductNameChange: (value: string) => void;
-  onStoryboardProductDescriptionChange: (value: string) => void;
-  onStoryboardGenderChange: (value: string) => void;
-  onStoryboardAudienceChange: (value: string) => void;
-  onStoryboardToneChange: (value: string) => void;
-  onStoryboardRegionChange: (value: string) => void;
-  onStoryboardScriptChange: (value: string) => void;
+  trimmingScene: VideoScene | null;
+  onRenameStoryboardFolder: (folder: DatasetFolder, newName: string) => void;
+  onSelectStoryboardFolder: (folder: DatasetFolder) => void;
+  onDeleteStoryboardFolder?: (folder: DatasetFolder) => void;
+  onStoryboardProductNameChange: (v: string) => void;
+  onStoryboardProductDescriptionChange: (v: string) => void;
+  onStoryboardGenderChange: (v: string) => void;
+  onStoryboardAudienceChange: (v: string) => void;
+  onStoryboardToneChange: (v: string) => void;
+  onStoryboardRegionChange: (v: string) => void;
+  onStoryboardScriptChange: (v: string) => void;
   onCopyInput: () => void;
   onCopyScriptPrompt: () => void;
   onImportStoryboard: (rawJson: string) => void | Promise<void>;
@@ -52,11 +51,9 @@ interface StoryboardPageProps {
   onSelectBeat: (beatId: string) => void;
   onPlayStoryboardMatch: (match: StoryboardMatch) => void;
   onTrimMatch: (match: StoryboardMatch) => void;
-  onStoryboardPlayerRef: (node: HTMLVideoElement | null) => void;
-  onStoryboardTimeUpdate: () => void;
-  onRenameStoryboardFolder: (folder: ProductFolderSummary) => void;
-  onDeleteStoryboardFolder?: (folder: ProductFolderSummary) => void;
-  onSelectStoryboardFolder: (folderId: number) => void;
+  onStoryboardPlayerRef: (el: HTMLVideoElement | null) => void;
+  onStoryboardTimeUpdate: (currentTime: number) => void;
+  onResetStoryboard: () => void;
 }
 
 export function StoryboardPage({
@@ -81,6 +78,9 @@ export function StoryboardPage({
   activeDataset,
   activeDatasetUsableForStoryboard,
   trimmingScene,
+  onRenameStoryboardFolder,
+  onSelectStoryboardFolder,
+  onDeleteStoryboardFolder,
   onStoryboardProductNameChange,
   onStoryboardProductDescriptionChange,
   onStoryboardGenderChange,
@@ -100,9 +100,7 @@ export function StoryboardPage({
   onTrimMatch,
   onStoryboardPlayerRef,
   onStoryboardTimeUpdate,
-  onRenameStoryboardFolder,
-  onDeleteStoryboardFolder,
-  onSelectStoryboardFolder,
+  onResetStoryboard,
 }: StoryboardPageProps) {
   const sourceViews = useMemo(() => storyboardSources.map(toSourceView), [storyboardSources]);
   const beatViews = useMemo(() => toBeatViews(storyboardResult), [storyboardResult]);
@@ -275,13 +273,21 @@ export function StoryboardPage({
             })}
           </div>
           <div className="shrink-0 border-t border-border bg-card px-3 py-2">
-            <button
-              onClick={onGenerateStoryboard}
-              disabled={isGeneratingStoryboard || sourceViews.length === 0 || storyboardSelectedVersionIds.length === 0}
-              className="w-full py-2 rounded-md text-xs font-semibold transition-colors bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isGeneratingStoryboard ? 'Đang tạo storyboard...' : 'Tạo storyboard'}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={onResetStoryboard}
+                className="w-full py-2 rounded-md text-xs font-semibold transition-colors bg-secondary text-secondary-foreground hover:bg-surface-hover"
+              >
+                Tạo mới
+              </button>
+              <button
+                onClick={onGenerateStoryboard}
+                disabled={isGeneratingStoryboard || sourceViews.length === 0 || storyboardSelectedVersionIds.length === 0}
+                className="w-full py-2 rounded-md text-xs font-semibold transition-colors bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isGeneratingStoryboard ? 'Đang tạo storyboard...' : 'Tạo storyboard'}
+              </button>
+            </div>
           </div>
         </div>
 

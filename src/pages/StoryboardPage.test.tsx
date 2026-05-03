@@ -87,6 +87,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -149,6 +150,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -216,6 +218,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -270,6 +273,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -332,6 +336,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -400,6 +405,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -454,6 +460,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -514,6 +521,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -525,6 +533,70 @@ describe('StoryboardPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Sửa/ }));
 
     expect(onRenameStoryboardFolder).toHaveBeenCalledWith(folder);
+  });
+
+  it('renders both "Tạo mới" and "Tạo storyboard" buttons in the footer and handles reset action', () => {
+    const onResetStoryboard = vi.fn();
+    render(
+      <StoryboardPage
+        storyboardFolder={{ id: 12, name: 'Loa', isSystem: false }}
+        storyboardFolders={[
+          { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 0 },
+        ]}
+        storyboardSourceSummary={{ videoCount: 1, sceneCount: 4 }}
+        storyboardProductDescription="Mô tả sản phẩm"
+        storyboardProductName="Loa"
+        storyboardGender="Audio"
+        storyboardAudience=""
+        storyboardTone=""
+        storyboardRegion=""
+        storyboardScript="Hook"
+        storyboardSelectedVersionIds={[]}
+        storyboardSources={[]}
+        storyboardResult={null}
+        savedStoryboards={[]}
+        selectedSavedStoryboardId={null}
+        selectedStoryboardBeatId={null}
+        storyboardPreviewMatch={null}
+        isGeneratingStoryboard={false}
+        activeDataset={null}
+        activeDatasetUsableForStoryboard
+        trimmingScene={null}
+        onRenameStoryboardFolder={vi.fn()}
+        onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
+        onStoryboardProductNameChange={vi.fn()}
+        onStoryboardGenderChange={vi.fn()}
+        onStoryboardAudienceChange={vi.fn()}
+        onStoryboardToneChange={vi.fn()}
+        onStoryboardRegionChange={vi.fn()}
+        onStoryboardScriptChange={vi.fn()}
+        onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={vi.fn()}
+        onToggleSourceVersion={vi.fn()}
+        onGenerateStoryboard={vi.fn()}
+        onSelectBeat={vi.fn()}
+        onPlayStoryboardMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onStoryboardPlayerRef={vi.fn()}
+        onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={onResetStoryboard}
+      />,
+    );
+
+    const resetButton = screen.getByRole('button', { name: 'Tạo mới' });
+    const generateButton = screen.getByRole('button', { name: 'Tạo storyboard' });
+
+    expect(resetButton).toBeInTheDocument();
+    expect(generateButton).toBeInTheDocument();
+    
+    expect(resetButton).not.toBeDisabled();
+
+    fireEvent.click(resetButton);
+    expect(onResetStoryboard).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the folder expand chevron vertically centered in the header row', () => {
@@ -576,6 +648,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -638,6 +711,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
@@ -696,6 +770,7 @@ describe('StoryboardPage', () => {
         onTrimMatch={vi.fn()}
         onStoryboardPlayerRef={vi.fn()}
         onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
       />,
     );
 
