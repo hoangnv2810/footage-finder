@@ -13,6 +13,7 @@ describe('StoryboardPage', () => {
           { folder: { id: 13, name: 'Mic', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 0 },
         ]}
         storyboardSourceSummary={{ videoCount: 2, sceneCount: 12 }}
+        storyboardProductDescription="Mô tả sản phẩm"
         storyboardProductName="Serum Vitamin C"
         storyboardGender="Skincare"
         storyboardAudience="Nữ 20-35"
@@ -28,6 +29,7 @@ describe('StoryboardPage', () => {
             createdAt: Date.UTC(2026, 3, 19, 10, 30),
             updatedAt: Date.UTC(2026, 3, 19, 10, 45),
             productName: 'Loa',
+            productDescription: 'Mô tả loa',
             category: 'Audio',
             targetAudience: '',
             tone: 'Tin cậy',
@@ -44,6 +46,7 @@ describe('StoryboardPage', () => {
             createdAt: Date.UTC(2026, 3, 19, 11, 30),
             updatedAt: Date.UTC(2026, 3, 19, 11, 45),
             productName: 'Loa',
+            productDescription: 'Mô tả loa',
             category: 'Audio',
             targetAudience: '',
             tone: 'Trẻ trung',
@@ -65,6 +68,7 @@ describe('StoryboardPage', () => {
         trimmingScene={null}
         onRenameStoryboardFolder={vi.fn()}
         onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
         onStoryboardProductNameChange={vi.fn()}
         onStoryboardGenderChange={vi.fn()}
         onStoryboardAudienceChange={vi.fn()}
@@ -72,6 +76,7 @@ describe('StoryboardPage', () => {
         onStoryboardRegionChange={vi.fn()}
         onStoryboardScriptChange={vi.fn()}
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
@@ -89,8 +94,8 @@ describe('StoryboardPage', () => {
     expect(screen.getByRole('button', { name: /Mic 1 video · 4 cảnh · 0 storyboard/ })).toBeInTheDocument();
     expect(screen.getByText('2 video · 12 cảnh · 2 storyboard')).toBeInTheDocument();
     expect(screen.getByText('2 video · 12 cảnh')).toBeInTheDocument();
-    expect(screen.getByText('AUTO')).toBeInTheDocument();
-    expect(screen.getByText('IMPORT')).toBeInTheDocument();
+    expect(screen.getByText(/Tạo tự động/)).toBeInTheDocument();
+    expect(screen.getByText(/Import JSON/)).toBeInTheDocument();
     expect(screen.queryByText('Đã copy input vào clipboard.')).not.toBeInTheDocument();
   });
 
@@ -105,6 +110,7 @@ describe('StoryboardPage', () => {
           { folder: { id: 13, name: 'Mic', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 0 },
         ]}
         storyboardSourceSummary={{ videoCount: 2, sceneCount: 12 }}
+        storyboardProductDescription="Mô tả sản phẩm"
         storyboardProductName="Loa"
         storyboardGender="Audio"
         storyboardAudience=""
@@ -124,6 +130,7 @@ describe('StoryboardPage', () => {
         trimmingScene={null}
         onRenameStoryboardFolder={vi.fn()}
         onSelectStoryboardFolder={onSelectStoryboardFolder}
+        onStoryboardProductDescriptionChange={vi.fn()}
         onStoryboardProductNameChange={vi.fn()}
         onStoryboardGenderChange={vi.fn()}
         onStoryboardAudienceChange={vi.fn()}
@@ -131,6 +138,7 @@ describe('StoryboardPage', () => {
         onStoryboardRegionChange={vi.fn()}
         onStoryboardScriptChange={vi.fn()}
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
@@ -157,6 +165,7 @@ describe('StoryboardPage', () => {
           { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 0 },
         ]}
         storyboardSourceSummary={{ videoCount: 1, sceneCount: 4 }}
+        storyboardProductDescription="Mô tả sản phẩm"
         storyboardProductName="Loa"
         storyboardGender="Audio"
         storyboardAudience=""
@@ -187,6 +196,7 @@ describe('StoryboardPage', () => {
         trimmingScene={null}
         onRenameStoryboardFolder={vi.fn()}
         onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
         onStoryboardProductNameChange={vi.fn()}
         onStoryboardGenderChange={vi.fn()}
         onStoryboardAudienceChange={vi.fn()}
@@ -194,6 +204,7 @@ describe('StoryboardPage', () => {
         onStoryboardRegionChange={vi.fn()}
         onStoryboardScriptChange={vi.fn()}
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
@@ -219,6 +230,7 @@ describe('StoryboardPage', () => {
           { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 2, sceneCount: 12 }, storyboardCount: 0 },
         ]}
         storyboardSourceSummary={{ videoCount: 2, sceneCount: 12 }}
+        storyboardProductDescription="Mô tả sản phẩm"
         storyboardProductName="Loa"
         storyboardGender="Audio"
         storyboardAudience=""
@@ -238,6 +250,7 @@ describe('StoryboardPage', () => {
         trimmingScene={null}
         onRenameStoryboardFolder={vi.fn()}
         onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
         onStoryboardProductNameChange={vi.fn()}
         onStoryboardGenderChange={vi.fn()}
         onStoryboardAudienceChange={vi.fn()}
@@ -245,6 +258,7 @@ describe('StoryboardPage', () => {
         onStoryboardRegionChange={vi.fn()}
         onStoryboardScriptChange={vi.fn()}
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
@@ -276,6 +290,7 @@ describe('StoryboardPage', () => {
           { folder, sourceSummary: { videoCount: 2, sceneCount: 12 }, storyboardCount: 0 },
         ]}
         storyboardSourceSummary={{ videoCount: 2, sceneCount: 12 }}
+        storyboardProductDescription="Mô tả sản phẩm"
         storyboardProductName="Loa"
         storyboardGender="Audio"
         storyboardAudience=""
@@ -295,6 +310,7 @@ describe('StoryboardPage', () => {
         trimmingScene={null}
         onRenameStoryboardFolder={onRenameStoryboardFolder}
         onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
         onStoryboardProductNameChange={vi.fn()}
         onStoryboardGenderChange={vi.fn()}
         onStoryboardAudienceChange={vi.fn()}
@@ -302,6 +318,7 @@ describe('StoryboardPage', () => {
         onStoryboardRegionChange={vi.fn()}
         onStoryboardScriptChange={vi.fn()}
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
@@ -336,6 +353,7 @@ describe('StoryboardPage', () => {
           { folder, sourceSummary: { videoCount: 2, sceneCount: 12 }, storyboardCount: 0 },
         ]}
         storyboardSourceSummary={{ videoCount: 2, sceneCount: 12 }}
+        storyboardProductDescription="Mô tả sản phẩm"
         storyboardProductName="Loa"
         storyboardGender="Audio"
         storyboardAudience=""
@@ -356,6 +374,7 @@ describe('StoryboardPage', () => {
         onRenameStoryboardFolder={vi.fn()}
         onDeleteStoryboardFolder={onDeleteStoryboardFolder}
         onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
         onStoryboardProductNameChange={vi.fn()}
         onStoryboardGenderChange={vi.fn()}
         onStoryboardAudienceChange={vi.fn()}
@@ -363,6 +382,7 @@ describe('StoryboardPage', () => {
         onStoryboardRegionChange={vi.fn()}
         onStoryboardScriptChange={vi.fn()}
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}

@@ -347,6 +347,7 @@ class DatasetSelectionPayload(BaseModel):
 
 class StoryboardRequest(BaseModel):
     product_name: str
+    product_description: str = ""
     category: str = ""
     target_audience: str = ""
     tone: str = ""
@@ -642,6 +643,7 @@ async def storyboard_generate(req: StoryboardRequest):
 
     product = {
         "name": req.product_name.strip(),
+        "description": req.product_description.strip(),
         "category": req.category.strip(),
         "target_audience": req.target_audience.strip(),
         "tone": req.tone.strip(),
@@ -660,6 +662,7 @@ async def storyboard_generate(req: StoryboardRequest):
 def _storyboard_product(req: StoryboardRequest) -> dict[str, str]:
     return {
         "name": req.product_name.strip(),
+        "description": req.product_description.strip(),
         "category": req.category.strip(),
         "target_audience": req.target_audience.strip(),
         "tone": req.tone.strip(),
@@ -688,6 +691,7 @@ def _storyboard_save_payload(
 ) -> dict[str, Any]:
     return {
         "product_name": req.product_name.strip(),
+        "product_description": req.product_description.strip(),
         "category": req.category.strip(),
         "target_audience": req.target_audience.strip(),
         "tone": req.tone.strip(),

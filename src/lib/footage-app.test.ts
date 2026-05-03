@@ -240,6 +240,7 @@ describe('buildStoryboardCopyPrompt', () => {
     const prompt = buildStoryboardCopyPrompt({
       product: {
         product_name: 'Serum C Glow',
+        product_description: 'Serum vitamin C hỗ trợ sáng da và mờ thâm',
         category: 'Chăm sóc da',
         target_audience: 'Nữ 25-35',
         tone: 'Tin cậy, tươi sáng',
@@ -285,6 +286,7 @@ describe('buildStoryboardCopyPrompt', () => {
 describe('saved storyboard api', () => {
   const payload = {
     product_name: 'Serum C Glow',
+    product_description: 'Serum vitamin C hỗ trợ sáng da và mờ thâm',
     category: 'Chăm sóc da',
     target_audience: 'Nữ 25-35',
     tone: 'Tin cậy, tươi sáng',
@@ -298,6 +300,7 @@ describe('saved storyboard api', () => {
     createdAt: 1710000000000,
     updatedAt: 1710000000000,
     productName: 'Serum C Glow',
+    productDescription: 'Serum vitamin C hỗ trợ sáng da và mờ thâm',
     category: 'Chăm sóc da',
     targetAudience: 'Nữ 25-35',
     tone: 'Tin cậy, tươi sáng',

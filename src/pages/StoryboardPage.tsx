@@ -18,6 +18,7 @@ interface StoryboardPageProps {
   }>;
   storyboardSourceSummary: { videoCount: number; sceneCount: number };
   storyboardProductName: string;
+  storyboardProductDescription: string;
   storyboardGender: string;
   storyboardAudience: string;
   storyboardTone: string;
@@ -35,12 +36,14 @@ interface StoryboardPageProps {
   activeDatasetUsableForStoryboard: boolean;
   trimmingScene: string | null;
   onStoryboardProductNameChange: (value: string) => void;
+  onStoryboardProductDescriptionChange: (value: string) => void;
   onStoryboardGenderChange: (value: string) => void;
   onStoryboardAudienceChange: (value: string) => void;
   onStoryboardToneChange: (value: string) => void;
   onStoryboardRegionChange: (value: string) => void;
   onStoryboardScriptChange: (value: string) => void;
   onCopyInput: () => void;
+  onCopyScriptPrompt: () => void;
   onImportStoryboard: (rawJson: string) => void | Promise<void>;
   onSelectSavedStoryboard: (id: string) => void;
   onDeleteSavedStoryboard: (id: string) => void;
@@ -61,6 +64,7 @@ export function StoryboardPage({
   storyboardFolders,
   storyboardSourceSummary,
   storyboardProductName,
+  storyboardProductDescription,
   storyboardGender,
   storyboardAudience,
   storyboardTone,
@@ -78,12 +82,14 @@ export function StoryboardPage({
   activeDatasetUsableForStoryboard,
   trimmingScene,
   onStoryboardProductNameChange,
+  onStoryboardProductDescriptionChange,
   onStoryboardGenderChange,
   onStoryboardAudienceChange,
   onStoryboardToneChange,
   onStoryboardRegionChange,
   onStoryboardScriptChange,
   onCopyInput,
+  onCopyScriptPrompt,
   onImportStoryboard,
   onSelectSavedStoryboard,
   onDeleteSavedStoryboard,
@@ -220,6 +226,8 @@ export function StoryboardPage({
                       <StoryboardInputPanel
                         productName={storyboardProductName}
                         setProductName={onStoryboardProductNameChange}
+                        productDescription={storyboardProductDescription}
+                        setProductDescription={onStoryboardProductDescriptionChange}
                         gender={storyboardGender}
                         setGender={onStoryboardGenderChange}
                         audience={storyboardAudience}
@@ -234,6 +242,7 @@ export function StoryboardPage({
                         selectedStoryboardId={selectedSavedStoryboardId}
                         folderName={folderName}
                         onCopyInput={onCopyInput}
+                        onCopyScriptPrompt={onCopyScriptPrompt}
                         onImportStoryboard={onImportStoryboard}
                         onSelectSavedStoryboard={onSelectSavedStoryboard}
                         onDeleteSavedStoryboard={onDeleteSavedStoryboard}

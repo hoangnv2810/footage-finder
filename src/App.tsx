@@ -18,6 +18,7 @@ import {
   api,
   assertCanImportStoryboard,
   buildDatasetItems,
+  buildScriptCopyPrompt,
   buildStoryboardCopyPrompt,
   normalizeHistory,
   normalizeHistoryItem,
@@ -74,6 +75,7 @@ function WorkspaceApp() {
   const pendingSceneRef = useRef<Record<number, Scene | undefined>>({});
 
   const [storyboardProductName, setStoryboardProductName] = useState('');
+  const [storyboardProductDescription, setStoryboardProductDescription] = useState('');
   const [storyboardGender, setStoryboardGender] = useState('');
   const [storyboardAudience, setStoryboardAudience] = useState('');
   const [storyboardTone, setStoryboardTone] = useState('');
@@ -173,6 +175,7 @@ function WorkspaceApp() {
 
   const restoreSavedStoryboard = useCallback((saved: SavedStoryboard) => {
     setStoryboardProductName(saved.productName || '');
+    setStoryboardProductDescription(saved.productDescription || '');
     setStoryboardGender(saved.category || '');
     setStoryboardAudience(saved.targetAudience || '');
     setStoryboardTone(saved.tone || '');
@@ -695,6 +698,7 @@ function WorkspaceApp() {
     try {
       const saved = await api.generateSavedStoryboard({
         product_name: storyboardProductName.trim(),
+        product_description: storyboardProductDescription.trim(),
         category: storyboardGender.trim(),
         target_audience: storyboardAudience.trim(),
         tone: storyboardTone.trim(),
@@ -715,6 +719,7 @@ function WorkspaceApp() {
 
   const getStoryboardProductInput = (): StoryboardProductInput => ({
     product_name: storyboardProductName.trim(),
+    product_description: storyboardProductDescription.trim(),
     category: storyboardGender.trim(),
     target_audience: storyboardAudience.trim(),
     tone: storyboardTone.trim(),
@@ -777,6 +782,15 @@ function WorkspaceApp() {
       toast.success('Đã copy input vào clipboard.');
     } catch {
       toast.error('Không thể copy input vào clipboard.');
+    }
+  };
+
+  const copyScriptPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(buildScriptCopyPrompt(getStoryboardProductInput()));
+      toast.success('Đã copy prompt tạo kịch bản.');
+    } catch {
+      toast.error('Không thể copy prompt tạo kịch bản.');
     }
   };
 
@@ -1286,6 +1300,7 @@ function WorkspaceApp() {
               storyboardFolders={storyboardFolders}
               storyboardSourceSummary={storyboardSourceSummary}
               storyboardProductName={storyboardProductName}
+              storyboardProductDescription={storyboardProductDescription}
               storyboardGender={storyboardGender}
               storyboardAudience={storyboardAudience}
               storyboardTone={storyboardTone}
@@ -1306,6 +1321,7 @@ function WorkspaceApp() {
               onDeleteStoryboardFolder={openDeleteFolderDialog}
               onSelectStoryboardFolder={setSelectedStoryboardFolderId}
               onStoryboardProductNameChange={setStoryboardProductName}
+              onStoryboardProductDescriptionChange={setStoryboardProductDescription}
               onStoryboardGenderChange={setStoryboardGender}
               onStoryboardAudienceChange={setStoryboardAudience}
               onStoryboardToneChange={setStoryboardTone}
@@ -1313,6 +1329,9 @@ function WorkspaceApp() {
               onStoryboardScriptChange={setStoryboardScript}
               onCopyInput={() => {
                 void copyStoryboardInput();
+              }}
+              onCopyScriptPrompt={() => {
+                void copyScriptPrompt();
               }}
               onImportStoryboard={importStoryboard}
               onSelectSavedStoryboard={(id) => {

@@ -346,6 +346,7 @@ def init_db() -> None:
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             product_name TEXT NOT NULL DEFAULT '',
+            product_description TEXT NOT NULL DEFAULT '',
             category TEXT NOT NULL DEFAULT '',
             target_audience TEXT NOT NULL DEFAULT '',
             tone TEXT NOT NULL DEFAULT '',
@@ -399,6 +400,7 @@ def init_db() -> None:
         "created_at": "INTEGER NOT NULL DEFAULT 0",
         "updated_at": "INTEGER NOT NULL DEFAULT 0",
         "product_name": "TEXT NOT NULL DEFAULT ''",
+        "product_description": "TEXT NOT NULL DEFAULT ''",
         "category": "TEXT NOT NULL DEFAULT ''",
         "target_audience": "TEXT NOT NULL DEFAULT ''",
         "tone": "TEXT NOT NULL DEFAULT ''",
@@ -1098,6 +1100,7 @@ def _storyboard_row_to_dict(row: sqlite3.Row, include_result: bool) -> dict:
         "createdAt": row["created_at"],
         "updatedAt": row["updated_at"],
         "productName": row["product_name"],
+        "productDescription": row["product_description"] if "product_description" in row.keys() else "",
         "category": row["category"],
         "targetAudience": row["target_audience"],
         "tone": row["tone"],
@@ -1122,13 +1125,14 @@ def save_storyboard_project(payload: dict[str, Any]) -> dict:
     conn.execute(
         """
         INSERT INTO storyboard_project (
-            id, created_at, updated_at, product_name, category, target_audience,
+            id, created_at, updated_at, product_name, product_description, category, target_audience,
             tone, key_benefits, script_text, selected_version_ids,
             candidate_snapshot_json, result_json, source, folder_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             updated_at = excluded.updated_at,
             product_name = excluded.product_name,
+            product_description = excluded.product_description,
             category = excluded.category,
             target_audience = excluded.target_audience,
             tone = excluded.tone,
@@ -1145,6 +1149,7 @@ def save_storyboard_project(payload: dict[str, Any]) -> dict:
             created_at,
             now,
             payload.get("product_name") or payload.get("productName") or "",
+            payload.get("product_description") or payload.get("productDescription") or "",
             payload.get("category") or "",
             payload.get("target_audience") or payload.get("targetAudience") or "",
             payload.get("tone") or "",

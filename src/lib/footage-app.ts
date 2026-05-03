@@ -180,6 +180,7 @@ export interface StoryboardCandidateScene {
 
 export interface StoryboardProductInput {
   product_name: string;
+  product_description: string;
   category: string;
   target_audience: string;
   tone: string;
@@ -201,6 +202,7 @@ export interface SavedStoryboard {
   createdAt: number;
   updatedAt: number;
   productName: string;
+  productDescription: string;
   category: string;
   targetAudience: string;
   tone: string;
@@ -254,6 +256,20 @@ export const buildStoryboardCopyPrompt = (input: {
     `candidate_scenes: ${JSON.stringify(input.candidate_scenes, null, 2)}`,
     `required_output_schema: ${JSON.stringify(outputSchema, null, 2)}`,
     'Use only candidateId values that exist as candidate_id in candidate_scenes.',
+  ].join('\n\n');
+};
+
+export const buildScriptCopyPrompt = (product: StoryboardProductInput) => {
+  return [
+    'Bạn là chuyên gia viết kịch bản video marketing ngắn cho TikTok/Reels/Facebook Ads.',
+    'Hãy dựa trên thông tin sản phẩm và đối tượng dưới đây để viết một kịch bản tiếng Việt có thể dùng trực tiếp cho video.',
+    'Yêu cầu:',
+    '- Viết tự nhiên, đúng tone giọng đã cho.',
+    '- Có hook mạnh trong 1-2 câu đầu.',
+    '- Có mạch nội dung rõ: vấn đề/nhu cầu, giới thiệu sản phẩm, lợi ích chính, bằng chứng hoặc demo gợi ý, CTA.',
+    '- Chia kịch bản thành các đoạn ngắn theo nhịp dựng video.',
+    '- Chỉ trả về kịch bản, không giải thích thêm.',
+    `Thông tin sản phẩm:\n${JSON.stringify(product, null, 2)}`,
   ].join('\n\n');
 };
 
@@ -331,6 +347,7 @@ export const api = {
 
   async generateStoryboard(payload: {
     product_name: string;
+    product_description?: string;
     category: string;
     target_audience: string;
     tone: string;

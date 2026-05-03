@@ -10,6 +10,7 @@ const savedStoryboard: SavedStoryboard = {
   createdAt: Date.UTC(2026, 3, 19, 10, 30),
   updatedAt: Date.UTC(2026, 3, 19, 10, 45),
   productName: 'Serum Vitamin C',
+  productDescription: 'Serum sáng da mờ thâm',
   category: 'Skincare',
   targetAudience: 'Nữ 20-35',
   tone: 'Tin cậy',
@@ -32,6 +33,8 @@ describe('StoryboardInputPanel', () => {
       <StoryboardInputPanel
         productName="Serum Vitamin C"
         setProductName={vi.fn()}
+        productDescription="Serum sáng da mờ thâm"
+        setProductDescription={vi.fn()}
         gender="Skincare"
         setGender={vi.fn()}
         audience="Nữ 20-35"
@@ -46,6 +49,7 @@ describe('StoryboardInputPanel', () => {
         selectedStoryboardId="storyboard-1"
         folderName="Loa"
         onCopyInput={onCopyInput}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={onImportStoryboard}
         onSelectSavedStoryboard={onSelectSavedStoryboard}
         onDeleteSavedStoryboard={onDeleteSavedStoryboard}
@@ -66,8 +70,6 @@ describe('StoryboardInputPanel', () => {
     expect(onSelectSavedStoryboard).toHaveBeenCalledWith('storyboard-1');
 
     fireEvent.click(screen.getByRole('button', { name: 'Import storyboard JSON' }));
-    expect(screen.getByText(/Storyboard sẽ được lưu vào folder:/)).toBeInTheDocument();
-    expect(screen.getByText('Loa')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('JSON storyboard'), { target: { value: '{"beats":[]}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Nhập JSON' }));
 
@@ -89,6 +91,8 @@ describe('StoryboardInputPanel', () => {
       <StoryboardInputPanel
         productName="Serum Vitamin C"
         setProductName={vi.fn()}
+        productDescription="Serum sáng da mờ thâm"
+        setProductDescription={vi.fn()}
         gender="Skincare"
         setGender={vi.fn()}
         audience="Nữ 20-35"
@@ -103,6 +107,7 @@ describe('StoryboardInputPanel', () => {
         selectedStoryboardId="storyboard-1"
         folderName="Loa"
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={onDeleteSavedStoryboard}
@@ -122,6 +127,8 @@ describe('StoryboardInputPanel', () => {
       <StoryboardInputPanel
         productName="Serum Vitamin C"
         setProductName={vi.fn()}
+        productDescription="Serum sáng da mờ thâm"
+        setProductDescription={vi.fn()}
         gender="Skincare"
         setGender={vi.fn()}
         audience="Nữ 20-35"
@@ -136,6 +143,7 @@ describe('StoryboardInputPanel', () => {
         selectedStoryboardId={null}
         folderName="Loa"
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={onImportStoryboard}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
@@ -156,6 +164,8 @@ describe('StoryboardInputPanel', () => {
       <StoryboardInputPanel
         productName="Serum Vitamin C"
         setProductName={vi.fn()}
+        productDescription="Serum sáng da mờ thâm"
+        setProductDescription={vi.fn()}
         gender="Skincare"
         setGender={vi.fn()}
         audience="Nữ 20-35"
@@ -170,6 +180,7 @@ describe('StoryboardInputPanel', () => {
         selectedStoryboardId={null}
         folderName="Loa"
         onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}

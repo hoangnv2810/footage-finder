@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ChevronDown, FileText, Package, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, FileText, Pencil, Trash2 } from 'lucide-react';
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -80,7 +80,7 @@ const AUDIENCE_OPTIONS = [
 const GENDER_OPTIONS = [
   "Nam",
   "Nữ",
-  "Cả nam và nữ"
+  "Cả hai"
 ];
 
 const REGION_OPTIONS = [
@@ -93,6 +93,8 @@ const REGION_OPTIONS = [
 interface StoryboardInputPanelProps {
   productName: string;
   setProductName: (v: string) => void;
+  productDescription: string;
+  setProductDescription: (v: string) => void;
   gender: string;
   setGender: (v: string) => void;
   audience: string;
@@ -107,6 +109,7 @@ interface StoryboardInputPanelProps {
   selectedStoryboardId: string | null;
   folderName: string;
   onCopyInput: () => void;
+  onCopyScriptPrompt: () => void;
   onImportStoryboard: (rawJson: string) => void | Promise<void>;
   onSelectSavedStoryboard: (id: string) => void;
   onDeleteSavedStoryboard: (id: string) => void;
@@ -116,6 +119,8 @@ interface StoryboardInputPanelProps {
 export function StoryboardInputPanel({
   productName,
   setProductName,
+  productDescription,
+  setProductDescription,
   gender,
   setGender,
   audience,
@@ -130,6 +135,7 @@ export function StoryboardInputPanel({
   selectedStoryboardId,
   folderName,
   onCopyInput,
+  onCopyScriptPrompt,
   onImportStoryboard,
   onSelectSavedStoryboard,
   onDeleteSavedStoryboard,
@@ -140,7 +146,7 @@ export function StoryboardInputPanel({
   const [rawJson, setRawJson] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<SavedStoryboard | null>(null);
 
-  const filledFields = [productName, gender, audience, tone, region].filter(Boolean).length;
+  const filledFields = [productName, productDescription, gender, audience, tone, region].filter(Boolean).length;
   const scriptLines = script.trim() ? script.trim().split('\n').length : 0;
 
   const submitImport = async () => {
@@ -160,7 +166,7 @@ export function StoryboardInputPanel({
           <h4 className="text-sm font-bold text-white">Thông tin & Kịch bản</h4>
           <p className="text-xs text-foreground truncate mt-0.5">
             {productName || 'Chưa nhập sản phẩm'}
-            <span className="text-muted-foreground"> · {filledFields}/5 trường · {scriptLines} dòng kịch bản</span>
+            <span className="text-muted-foreground"> · {filledFields}/6 trường · {scriptLines} dòng kịch bản</span>
           </p>
         </div>
 
@@ -178,19 +184,32 @@ export function StoryboardInputPanel({
 
             <div className="space-y-3 px-4 py-2">
               <section className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-primary" />
-                  <h4 className="text-sm font-medium text-foreground">Thông tin sản phẩm</h4>
-                </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Tên sản phẩm" value={productName} onChange={setProductName} placeholder="VD: Serum Vitamin C" />
+                  <div className="col-span-2">
+                    <label className="mb-1 block text-sm font-normal text-foreground">Tên sản phẩm</label>
+                    <input
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
+                      placeholder="VD: Serum Vitamin C"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="mb-1 block text-sm font-normal text-foreground">Mô tả sản phẩm</label>
+                    <textarea
+                      value={productDescription}
+                      onChange={(e) => setProductDescription(e.target.value)}
+                      placeholder="VD: Serum vitamin C giúp da sáng đều màu, mờ thâm, phù hợp dùng buổi sáng..."
+                      className="h-20 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none custom-scrollbar"
+                    />
+                  </div>
                   <div>
                     <label className="mb-1 block text-sm font-normal text-foreground">Độ tuổi</label>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button type="button" className="flex w-full h-[38px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none hover:bg-accent hover:text-accent-foreground">
                           <span className="truncate">
-                            {audience ? audience : "Chọn độ tuổi..."}
+                            {audience ? audience.split(', ').map((a) => a.replace(/ tuổi$/, '')).join(', ') : "Chọn độ tuổi..."}
                           </span>
                           <ChevronDown className="h-4 w-4 opacity-50" />
                         </button>
@@ -231,18 +250,13 @@ export function StoryboardInputPanel({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-[200px]">
                         {GENDER_OPTIONS.map((opt) => {
-                          const isSelected = gender.split(', ').includes(opt);
+                          const isSelected = gender === opt;
                           return (
                             <DropdownMenuCheckboxItem
                               key={opt}
                               checked={isSelected}
                               onCheckedChange={(checked) => {
-                                const current = gender ? gender.split(', ').filter(Boolean) : [];
-                                if (checked) {
-                                  setGender([...current, opt].join(', '));
-                                } else {
-                                  setGender(current.filter((v) => v !== opt).join(', '));
-                                }
+                                setGender(checked ? opt : '');
                               }}
                             >
                               {opt}
@@ -286,7 +300,7 @@ export function StoryboardInputPanel({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <label className="mb-1 block text-sm font-normal text-foreground">Tone giọng</label>
                     <Select value={tone} onValueChange={setTone}>
                       <SelectTrigger className="w-full h-[38px] text-sm">
@@ -308,9 +322,19 @@ export function StoryboardInputPanel({
               </section>
 
               <section className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <h4 className="text-sm font-medium text-foreground">Kịch bản</h4>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <h4 className="text-sm font-medium text-foreground">Kịch bản</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onCopyScriptPrompt}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1.5 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy prompt tạo kịch bản
+                  </button>
                 </div>
                 <textarea
                   value={script}
@@ -437,16 +461,3 @@ function formatSavedSource(source: SavedStoryboard['source']) {
   return source === 'generated' ? 'Tạo tự động' : 'Import JSON';
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-normal text-foreground">{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-md border border-input bg-background px-2.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-      />
-    </div>
-  );
-}
