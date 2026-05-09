@@ -10,9 +10,9 @@ import type { BeatMatchView, SourceVersionView, StoryboardBeatView } from '@/com
 import type { DatasetItem, ProductFolderSummary, SavedStoryboard, StoryboardMatch, StoryboardResult, StoryboardSource } from '@/lib/footage-app';
 
 interface StoryboardPageProps {
-  storyboardFolder: DatasetFolder;
-  storyboardFolders: { folder: DatasetFolder; sourceSummary: StoryboardSourceSummary; storyboardCount: number }[];
-  storyboardSourceSummary: StoryboardSourceSummary;
+  storyboardFolder: ProductFolderSummary | null;
+  storyboardFolders: { folder: ProductFolderSummary; sourceSummary: { videoCount: number; sceneCount: number }; storyboardCount: number }[];
+  storyboardSourceSummary: { videoCount: number; sceneCount: number };
   storyboardProductName: string;
   storyboardProductDescription: string;
   storyboardGender: string;
@@ -28,12 +28,12 @@ interface StoryboardPageProps {
   selectedStoryboardBeatId: string | null;
   storyboardPreviewMatch: StoryboardMatch | null;
   isGeneratingStoryboard: boolean;
-  activeDataset: ExtendedDataset | null;
+  activeDataset: DatasetItem | null;
   activeDatasetUsableForStoryboard: boolean;
-  trimmingScene: VideoScene | null;
-  onRenameStoryboardFolder: (folder: DatasetFolder, newName: string) => void;
-  onSelectStoryboardFolder: (folder: DatasetFolder) => void;
-  onDeleteStoryboardFolder?: (folder: DatasetFolder) => void;
+  trimmingScene: string | null;
+  onRenameStoryboardFolder: (folder: ProductFolderSummary) => void;
+  onSelectStoryboardFolder: (folder: ProductFolderSummary) => void;
+  onDeleteStoryboardFolder?: (folder: ProductFolderSummary) => void;
   onStoryboardProductNameChange: (v: string) => void;
   onStoryboardProductDescriptionChange: (v: string) => void;
   onStoryboardGenderChange: (v: string) => void;
@@ -52,7 +52,7 @@ interface StoryboardPageProps {
   onPlayStoryboardMatch: (match: StoryboardMatch) => void;
   onTrimMatch: (match: StoryboardMatch) => void;
   onStoryboardPlayerRef: (el: HTMLVideoElement | null) => void;
-  onStoryboardTimeUpdate: (currentTime: number) => void;
+  onStoryboardTimeUpdate: () => void;
   onResetStoryboard: () => void;
 }
 
@@ -161,7 +161,7 @@ export function StoryboardPage({
                           return;
                         }
                         setExpandedFolderId(row.folder.id);
-                        if (!isActive) onSelectStoryboardFolder(row.folder.id);
+                        if (!isActive) onSelectStoryboardFolder(row.folder);
                       }}
                       className="flex min-w-0 flex-1 items-center gap-2 text-left"
                     >
@@ -275,12 +275,15 @@ export function StoryboardPage({
           <div className="shrink-0 border-t border-border bg-card px-3 py-2">
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={onResetStoryboard}
-                className="w-full py-2 rounded-md text-xs font-semibold transition-colors bg-secondary text-secondary-foreground hover:bg-surface-hover"
+                disabled={isGeneratingStoryboard}
+                className="w-full py-2 rounded-md text-xs font-semibold transition-colors bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Tạo mới
               </button>
               <button
+                type="button"
                 onClick={onGenerateStoryboard}
                 disabled={isGeneratingStoryboard || sourceViews.length === 0 || storyboardSelectedVersionIds.length === 0}
                 className="w-full py-2 rounded-md text-xs font-semibold transition-colors bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"

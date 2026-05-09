@@ -1314,14 +1314,14 @@ function WorkspaceApp() {
               savedStoryboards={currentSavedStoryboards}
               selectedSavedStoryboardId={selectedSavedStoryboardId}
               selectedStoryboardBeatId={selectedStoryboardBeatId}
-              storyboardPreviewMatch={resolvedStoryboardPreviewMatch}
+              storyboardPreviewMatch={storyboardPreviewMatch}
               isGeneratingStoryboard={isGeneratingStoryboard}
               activeDataset={activeDataset}
               activeDatasetUsableForStoryboard={activeDatasetUsableForStoryboard}
               trimmingScene={trimmingScene}
               onRenameStoryboardFolder={openRenameFolderDialog}
+              onSelectStoryboardFolder={(f) => setSelectedStoryboardFolderId(f.id)}
               onDeleteStoryboardFolder={openDeleteFolderDialog}
-              onSelectStoryboardFolder={setSelectedStoryboardFolderId}
               onStoryboardProductNameChange={setStoryboardProductName}
               onStoryboardProductDescriptionChange={setStoryboardProductDescription}
               onStoryboardGenderChange={setStoryboardGender}
@@ -1329,19 +1329,11 @@ function WorkspaceApp() {
               onStoryboardToneChange={setStoryboardTone}
               onStoryboardRegionChange={setStoryboardRegion}
               onStoryboardScriptChange={setStoryboardScript}
-              onCopyInput={() => {
-                void copyStoryboardInput();
-              }}
-              onCopyScriptPrompt={() => {
-                void copyScriptPrompt();
-              }}
+              onCopyInput={copyStoryboardInput}
+              onCopyScriptPrompt={copyScriptPrompt}
               onImportStoryboard={importStoryboard}
-              onSelectSavedStoryboard={(id) => {
-                void selectSavedStoryboard(id);
-              }}
-              onDeleteSavedStoryboard={(id) => {
-                void deleteSavedStoryboard(id);
-              }}
+              onSelectSavedStoryboard={selectSavedStoryboard}
+              onDeleteSavedStoryboard={deleteSavedStoryboard}
               onToggleSourceVersion={(versionId, checked) => {
                 setStoryboardSelectedVersionIds((prev) => (
                   checked ? [...prev, versionId] : prev.filter((id) => id !== versionId)
@@ -1350,11 +1342,10 @@ function WorkspaceApp() {
               onGenerateStoryboard={generateStoryboard}
               onSelectBeat={setSelectedStoryboardBeatId}
               onPlayStoryboardMatch={playStoryboardMatch}
-              onTrimMatch={(match) => {
-                void trimAndDownload({ fileName: match.fileName }, match.scene, match.sceneIndex);
-              }}
+              onTrimMatch={(match) => void trimAndDownload({ fileName: match.fileName }, match.scene, match.sceneIndex)}
               onStoryboardPlayerRef={setStoryboardPlayer}
               onStoryboardTimeUpdate={handleStoryboardTimeUpdate}
+              onResetStoryboard={resetStoryboardState}
             />,
           )}
         />

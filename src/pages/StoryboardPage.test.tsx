@@ -156,7 +156,7 @@ describe('StoryboardPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Mic 1 video · 4 cảnh · 0 storyboard/ }));
 
-    expect(onSelectStoryboardFolder).toHaveBeenCalledWith(13);
+    expect(onSelectStoryboardFolder).toHaveBeenCalledWith({ id: 13, name: 'Mic', isSystem: false });
   });
 
   it('keeps the generate button outside the scrollable folder accordion', () => {
