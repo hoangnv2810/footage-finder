@@ -192,6 +192,32 @@ describe('StoryboardTimelinePanel', () => {
     expect(onRemoveClip).not.toHaveBeenCalled();
   });
 
+  it('does not show saving status under the timeline header while saving', () => {
+    renderPanel({ isSaving: true });
+
+    expect(screen.getByTestId('timeline-panel-header')).not.toHaveTextContent('Đang lưu bản dựng...');
+  });
+
+  it('does not dim visible toolbar buttons while saving', () => {
+    renderPanel({ isSaving: true });
+
+    expect(screen.getByRole('button', { name: 'Tạo bản dựng' })).not.toHaveClass('disabled:opacity-50');
+    expect(screen.getByRole('button', { name: 'Tạo nhanh' })).not.toHaveClass('disabled:opacity-50');
+    expect(screen.getByRole('button', { name: 'Làm mới' })).not.toHaveClass('disabled:opacity-50');
+    expect(screen.getByRole('button', { name: 'Xuất clip rời (.zip)' })).not.toHaveClass('disabled:opacity-50');
+  });
+
+  it('does not dim timeline rows or clip action icons while saving', () => {
+    renderPanel({ isSaving: true });
+    const timelineRow = screen.getByTestId('timeline-row-timeline-1');
+
+    expect(within(timelineRow).getByRole('button', { name: /1 clip/ })).not.toHaveClass('disabled:opacity-50');
+    expect(within(timelineRow).getByRole('button', { name: 'Mở menu bản dựng Bản dựng chính' })).not.toHaveClass('disabled:opacity-50');
+    expect(screen.getByRole('button', { name: 'Đưa Hook lên' })).not.toHaveClass('disabled:opacity-50');
+    expect(screen.getByRole('button', { name: 'Đưa Hook xuống' })).not.toHaveClass('disabled:opacity-50');
+    expect(screen.getByRole('button', { name: 'Xoá Hook khỏi timeline' })).not.toHaveClass('disabled:opacity-50');
+  });
+
   it('renames bulk actions for the vertical build flow', () => {
     const onAddStoryboard = vi.fn();
     const onClearClips = vi.fn();

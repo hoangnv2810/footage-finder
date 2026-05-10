@@ -135,9 +135,9 @@ export function StoryboardTimelinePanel({
         <div className="flex items-center justify-between gap-2">
           <div data-testid="timeline-panel-header" className="min-w-0">
             <h4 className="text-[13px] font-semibold text-white">Timeline bản dựng</h4>
-            {isLoading || isSaving || !selectedTimeline ? (
+            {isLoading || !selectedTimeline ? (
               <p className="text-xs text-muted-foreground">
-                {isLoading ? 'Đang tải bản dựng...' : isSaving ? 'Đang lưu bản dựng...' : 'Chưa có bản dựng'}
+                {isLoading ? 'Đang tải bản dựng...' : 'Chưa có bản dựng'}
               </p>
             ) : null}
           </div>
@@ -147,7 +147,7 @@ export function StoryboardTimelinePanel({
               type="button"
               onClick={() => setIsCreateDialogOpen(true)}
               disabled={isBusy}
-              className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed"
             >
               Tạo bản dựng
             </button>
@@ -200,7 +200,7 @@ export function StoryboardTimelinePanel({
                       type="button"
                       onClick={() => onSelectTimeline(timeline.id)}
                       disabled={isBusy}
-                      className="min-w-0 flex-1 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                      className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
                     >
                       <span className={cn('block truncate text-xs font-semibold', isSelected ? 'text-primary' : 'text-foreground')}>{timeline.name}</span>
                       <span className="block text-[11px] text-muted-foreground">{timeline.clips.length} clip · {formatDuration(timelineDuration)}</span>
@@ -211,7 +211,7 @@ export function StoryboardTimelinePanel({
                           type="button"
                           disabled={isBusy}
                           aria-label={`Mở menu bản dựng ${timeline.name}`}
-                          className="shrink-0 cursor-pointer rounded-lg border border-transparent p-1.5 text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          className="shrink-0 cursor-pointer rounded-lg border border-transparent p-1.5 text-muted-foreground disabled:cursor-not-allowed"
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
@@ -245,7 +245,7 @@ export function StoryboardTimelinePanel({
             type="button"
             onClick={onAddStoryboard}
             disabled={!selectedTimeline || isBusy}
-            className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed"
           >
             Tạo nhanh
           </button>
@@ -253,7 +253,7 @@ export function StoryboardTimelinePanel({
             type="button"
             onClick={onClearClips}
             disabled={!selectedTimeline || clipCount === 0 || isBusy}
-            className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed"
           >
             Làm mới
           </button>
@@ -286,7 +286,7 @@ export function StoryboardTimelinePanel({
                         disabled={isBusy}
                         aria-label={`Đưa ${clip.label} lên`}
                         title="Lên"
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-secondary/70 text-secondary-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-secondary/70 text-secondary-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed"
                       >
                         <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
@@ -296,7 +296,7 @@ export function StoryboardTimelinePanel({
                         disabled={isBusy}
                         aria-label={`Đưa ${clip.label} xuống`}
                         title="Xuống"
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-secondary/70 text-secondary-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-secondary/70 text-secondary-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed"
                       >
                         <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
@@ -306,7 +306,7 @@ export function StoryboardTimelinePanel({
                         disabled={isBusy}
                         aria-label={`Xoá ${clip.label} khỏi timeline`}
                         title="Xoá"
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
@@ -334,7 +334,7 @@ export function StoryboardTimelinePanel({
           type="button"
           onClick={() => selectedTimeline && onExport(selectedTimeline.id)}
           disabled={!canExport}
-          className="w-full rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed"
         >
           {isExporting ? 'Đang xuất...' : 'Xuất clip rời (.zip)'}
         </button>
