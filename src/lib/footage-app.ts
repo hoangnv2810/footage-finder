@@ -217,6 +217,40 @@ export interface SavedStoryboard {
   result?: StoryboardResult;
 }
 
+export interface StoryboardTimelineClip {
+  id: string;
+  timelineId: string;
+  beatId: string | null;
+  label: string;
+  filename: string;
+  start: number;
+  end: number;
+  sceneIndex: number | null;
+  position: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface StoryboardTimeline {
+  id: string;
+  storyboardId: string;
+  name: string;
+  position: number;
+  createdAt: number;
+  updatedAt: number;
+  clips: StoryboardTimelineClip[];
+}
+
+export interface StoryboardTimelineClipInput {
+  id?: string;
+  beatId: string | null;
+  label: string;
+  filename: string;
+  start: number;
+  end: number;
+  sceneIndex: number | null;
+}
+
 export const buildStoryboardCopyPrompt = (input: {
   product: StoryboardProductInput;
   script_text: string;
@@ -287,6 +321,72 @@ const readErrorDetail = async (res: Response) => {
   const payload = await res.json().catch(() => null);
   return payload?.detail || `Server lỗi: ${res.status}`;
 };
+
+export async function fetchStoryboardTimelines(storyboardId: string): Promise<StoryboardTimeline[]> {
+  const res = await fetch(`/api/storyboards/${encodeURIComponent(storyboardId)}/timelines`);
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  const payload = await res.json() as { timelines: StoryboardTimeline[] };
+  return payload.timelines;
+}
+
+export async function createStoryboardTimeline(storyboardId: string, name?: string): Promise<StoryboardTimeline> {
+  const res = await fetch(`/api/storyboards/${encodeURIComponent(storyboardId)}/timelines`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return await res.json() as StoryboardTimeline;
+}
+
+export async function updateStoryboardTimeline(
+  timelineId: string,
+  payload: { name?: string; position?: number },
+): Promise<StoryboardTimeline> {
+  const res = await fetch(`/api/storyboard-timelines/${encodeURIComponent(timelineId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return await res.json() as StoryboardTimeline;
+}
+
+export async function deleteStoryboardTimeline(timelineId: string): Promise<void> {
+  const res = await fetch(`/api/storyboard-timelines/${encodeURIComponent(timelineId)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+}
+
+export async function replaceStoryboardTimelineClips(
+  timelineId: string,
+  clips: StoryboardTimelineClipInput[],
+): Promise<StoryboardTimeline> {
+  const res = await fetch(`/api/storyboard-timelines/${encodeURIComponent(timelineId)}/clips`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clips }),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return await res.json() as StoryboardTimeline;
+}
+
+export async function exportStoryboardTimeline(timelineId: string): Promise<Blob> {
+  const res = await fetch(`/api/storyboard-timelines/${encodeURIComponent(timelineId)}/export`, { method: 'POST' });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return await res.blob();
+}
 
 export const api = {
   async history(): Promise<HistoryItem[]> {

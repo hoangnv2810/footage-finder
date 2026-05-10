@@ -2,10 +2,12 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import time
+import zipfile
 from pathlib import Path
 from typing import Any, List
 
@@ -27,12 +29,15 @@ from analysis import (
     validate_import_scenes,
 )
 from db import (
+    create_storyboard_timeline,
     create_product_folder,
     delete_dataset,
     delete_product_folder,
     delete_history,
     delete_storyboard_project,
+    delete_storyboard_timeline,
     get_storyboard_project,
+    get_storyboard_timeline,
     get_video_file_filename,
     get_version_scenes,
     get_video_versions_for_storyboard,
@@ -40,7 +45,9 @@ from db import (
     list_history,
     list_product_folders,
     list_storyboard_projects,
+    list_storyboard_timelines,
     rename_product_folder,
+    replace_storyboard_timeline_clips,
     save_analysis,
     save_analysis_error,
     save_history,
@@ -52,6 +59,7 @@ from db import (
     update_dataset_product_name,
     update_video_selection_by_db_video_id,
     update_history_product_name,
+    update_storyboard_timeline,
     update_video_selection,
 )
 from sse import sse_event
@@ -359,6 +367,29 @@ class StoryboardRequest(BaseModel):
 
 class ImportStoryboardRequest(StoryboardRequest):
     result_json: Any
+
+
+class TimelineCreateRequest(BaseModel):
+    name: str | None = None
+
+
+class TimelineUpdateRequest(BaseModel):
+    name: str | None = None
+    position: int | None = None
+
+
+class TimelineClipPayload(BaseModel):
+    id: str | None = None
+    beatId: str | None = None
+    label: str
+    filename: str
+    start: float
+    end: float
+    sceneIndex: int | None = None
+
+
+class TimelineClipsReplaceRequest(BaseModel):
+    clips: list[TimelineClipPayload]
 
 
 class HistoryProductPayload(BaseModel):
@@ -761,6 +792,62 @@ async def storyboards_delete(storyboard_id: str):
     return {"deleted": True}
 
 
+@app.get("/api/storyboards/{storyboard_id}/timelines")
+async def storyboard_timelines_list(storyboard_id: str):
+    storyboard = await asyncio.to_thread(get_storyboard_project, storyboard_id)
+    if not storyboard:
+        raise HTTPException(status_code=404, detail="Storyboard not found")
+    timelines = await asyncio.to_thread(list_storyboard_timelines, storyboard_id)
+    return {"timelines": timelines}
+
+
+@app.post("/api/storyboards/{storyboard_id}/timelines")
+async def storyboard_timelines_create(storyboard_id: str, req: TimelineCreateRequest):
+    timeline = await asyncio.to_thread(
+        create_storyboard_timeline, storyboard_id, req.name
+    )
+    if not timeline:
+        raise HTTPException(status_code=404, detail="Storyboard not found")
+    return timeline
+
+
+@app.patch("/api/storyboard-timelines/{timeline_id}")
+async def storyboard_timeline_update(timeline_id: str, req: TimelineUpdateRequest):
+    payload = req.model_dump(exclude_unset=True)
+    timeline = await asyncio.to_thread(update_storyboard_timeline, timeline_id, payload)
+    if not timeline:
+        raise HTTPException(status_code=404, detail="Timeline not found")
+    return timeline
+
+
+@app.delete("/api/storyboard-timelines/{timeline_id}")
+async def storyboard_timeline_delete(timeline_id: str):
+    deleted = await asyncio.to_thread(delete_storyboard_timeline, timeline_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Timeline not found")
+    return {"deleted": True}
+
+
+@app.put("/api/storyboard-timelines/{timeline_id}/clips")
+async def storyboard_timeline_clips_replace(
+    timeline_id: str, req: TimelineClipsReplaceRequest
+):
+    clips = [clip.model_dump() for clip in req.clips]
+    try:
+        for clip in clips:
+            clip["filename"] = validate_video_filename(clip["filename"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if any(clip["end"] <= clip["start"] for clip in clips):
+        raise HTTPException(status_code=400, detail="Invalid clip range")
+    timeline = await asyncio.to_thread(
+        replace_storyboard_timeline_clips, timeline_id, clips
+    )
+    if not timeline:
+        raise HTTPException(status_code=404, detail="Timeline not found")
+    return timeline
+
+
 # --- Trim ---
 
 
@@ -768,6 +855,50 @@ class TrimRequest(BaseModel):
     filename: str
     start: float
     end: float
+
+
+def _slug_filename_part(value: str, fallback: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", value.strip()).strip("-").lower()
+    return slug or fallback
+
+
+def _format_time_for_filename(seconds: float) -> str:
+    total_seconds = max(0, int(seconds))
+    minutes = total_seconds // 60
+    remaining_seconds = total_seconds % 60
+    return f"{minutes:02d}-{remaining_seconds:02d}"
+
+
+def _timeline_clip_download_name(index: int, clip: dict) -> str:
+    label = _slug_filename_part(str(clip.get("label") or ""), "clip")
+    source = _slug_filename_part(Path(str(clip.get("filename") or "video")).stem, "video")
+    start = _format_time_for_filename(float(clip.get("start") or 0))
+    end = _format_time_for_filename(float(clip.get("end") or 0))
+    return f"{index + 1:02d}_{label}_{source}_{start}_{end}.mp4"
+
+
+def _timeline_zip_download_name(timeline: dict) -> str:
+    storyboard = get_storyboard_project(timeline["storyboardId"])
+    product_name = _slug_filename_part(
+        str((storyboard or {}).get("productName") or "storyboard"), "storyboard"
+    )
+    timeline_name = _slug_filename_part(str(timeline.get("name") or "clips"), "clips")
+    return f"storyboard_{product_name}_{timeline_name}.zip"
+
+
+def _export_timeline_zip(timeline: dict, tmpdir: str, zip_path: str) -> None:
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for index, clip in enumerate(timeline.get("clips") or []):
+            source_path = get_video_path(validate_video_filename(clip["filename"]))
+            clip_name = _timeline_clip_download_name(index, clip)
+            output_path = os.path.join(tmpdir, clip_name)
+            _trim(
+                str(source_path),
+                output_path,
+                float(clip["start"]),
+                float(clip["end"]),
+            )
+            archive.write(output_path, arcname=clip_name)
 
 
 def _run_ffmpeg(args: list[str]) -> subprocess.CompletedProcess:
@@ -845,6 +976,44 @@ async def trim_video(req: TrimRequest):
             filename=download_name,
             background=BackgroundTask(shutil.rmtree, tmpdir, ignore_errors=True),
         )
+    except Exception:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise
+
+
+@app.post("/api/storyboard-timelines/{timeline_id}/export")
+async def storyboard_timeline_export(timeline_id: str):
+    if not FFMPEG_PATH:
+        raise HTTPException(status_code=500, detail="ffmpeg not found on server")
+
+    timeline = await asyncio.to_thread(get_storyboard_timeline, timeline_id)
+    if not timeline:
+        raise HTTPException(status_code=404, detail="Timeline not found")
+
+    clips = timeline.get("clips") or []
+    if not clips:
+        raise HTTPException(status_code=400, detail="Timeline is empty")
+    if any(float(clip.get("end") or 0) <= float(clip.get("start") or 0) for clip in clips):
+        raise HTTPException(status_code=400, detail="Invalid clip range")
+
+    tmpdir = tempfile.mkdtemp(prefix="storyboard_timeline_")
+    zip_path = os.path.join(tmpdir, "clips.zip")
+    try:
+        await asyncio.to_thread(_export_timeline_zip, timeline, tmpdir, zip_path)
+
+        download_name = await asyncio.to_thread(_timeline_zip_download_name, timeline)
+        return FileResponse(
+            path=zip_path,
+            media_type="application/zip",
+            filename=download_name,
+            background=BackgroundTask(shutil.rmtree, tmpdir, ignore_errors=True),
+        )
+    except FileNotFoundError as exc:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise HTTPException(status_code=404, detail="Source video not found") from exc
+    except ValueError as exc:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise HTTPException(status_code=400, detail="Invalid video filename") from exc
     except Exception:
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise

@@ -1,7 +1,27 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { StoryboardMatch, StoryboardResult } from '@/lib/footage-app';
+
 import { StoryboardPage } from './StoryboardPage';
+
+const storyboardTimelineProps = {
+  storyboardTimelines: [],
+  selectedStoryboardTimelineId: null,
+  isLoadingStoryboardTimelines: false,
+  isMutatingStoryboardTimeline: false,
+  isExportingStoryboardTimeline: false,
+  onCreateStoryboardTimeline: vi.fn(),
+  onSelectStoryboardTimeline: vi.fn(),
+  onRenameStoryboardTimeline: vi.fn(),
+  onDeleteStoryboardTimeline: vi.fn(),
+  onAddStoryboardToTimeline: vi.fn(),
+  onAddMatchToTimeline: vi.fn(),
+  onMoveTimelineClip: vi.fn(),
+  onRemoveTimelineClip: vi.fn(),
+  onClearTimelineClips: vi.fn(),
+  onExportStoryboardTimeline: vi.fn(),
+};
 
 describe('StoryboardPage', () => {
   it('renders compact folder context, source summary, and storyboard source badges', () => {
@@ -62,6 +82,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -125,6 +146,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -193,6 +215,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -248,6 +271,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -311,6 +335,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -380,6 +405,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -435,6 +461,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -496,6 +523,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -558,6 +586,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -623,6 +652,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -686,6 +716,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -744,6 +775,7 @@ describe('StoryboardPage', () => {
         selectedSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
         isGeneratingStoryboard={false}
         activeDataset={null}
         activeDatasetUsableForStoryboard
@@ -778,5 +810,103 @@ describe('StoryboardPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Xóa/ }));
 
     expect(onDeleteStoryboardFolder).toHaveBeenCalledWith(folder);
+  });
+
+  it('forwards the raw storyboard match when adding a preview match to the timeline', () => {
+    const onAddMatchToTimeline = vi.fn();
+    const match: StoryboardMatch = {
+      id: 'match-raw-1',
+      beatId: 'beat-1',
+      videoVersionId: 'version-1',
+      fileName: 'hook-demo.mp4',
+      sceneIndex: 3,
+      score: 92,
+      matchReason: 'Khớp hook mở đầu',
+      usageType: 'direct_product',
+      scene: {
+        keyword: 'hook',
+        start: 4,
+        end: 8,
+        description: 'Cận cảnh sản phẩm trong bối cảnh sáng',
+        mood: 'Sáng',
+        shot_type: 'Close-up',
+      },
+    };
+    const storyboardResult: StoryboardResult = {
+      beats: [
+        {
+          id: 'beat-1',
+          label: 'Hook',
+          text: 'Mở đầu bằng sản phẩm',
+          intent: 'Thu hút sự chú ý',
+          desiredVisuals: 'Cận cảnh sản phẩm',
+          durationHint: 4,
+          position: 0,
+        },
+      ],
+      beatMatches: [{ beatId: 'beat-1', matches: [match] }],
+      models: {
+        video_analysis_model: 'qwen3.6-plus',
+        script_planning_model: 'qwen3.6-plus',
+        scene_matching_model: 'qwen3.6-plus',
+      },
+    };
+
+    render(
+      <StoryboardPage
+        storyboardFolder={{ id: 12, name: 'Loa', isSystem: false }}
+        storyboardFolders={[
+          { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 1 },
+        ]}
+        storyboardSourceSummary={{ videoCount: 1, sceneCount: 4 }}
+        storyboardProductDescription="Mô tả sản phẩm"
+        storyboardProductName="Loa"
+        storyboardGender="Audio"
+        storyboardAudience=""
+        storyboardTone=""
+        storyboardRegion=""
+        storyboardScript="Hook"
+        storyboardSelectedVersionIds={[]}
+        storyboardSources={[]}
+        storyboardResult={storyboardResult}
+        savedStoryboards={[]}
+        selectedSavedStoryboardId="storyboard-1"
+        selectedStoryboardBeatId="beat-1"
+        storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
+        isGeneratingStoryboard={false}
+        activeDataset={null}
+        activeDatasetUsableForStoryboard
+        trimmingScene={null}
+        onRenameStoryboardFolder={vi.fn()}
+        onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
+        onStoryboardProductNameChange={vi.fn()}
+        onStoryboardGenderChange={vi.fn()}
+        onStoryboardAudienceChange={vi.fn()}
+        onStoryboardToneChange={vi.fn()}
+        onStoryboardRegionChange={vi.fn()}
+        onStoryboardScriptChange={vi.fn()}
+        onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={vi.fn()}
+        onToggleSourceVersion={vi.fn()}
+        onGenerateStoryboard={vi.fn()}
+        onSelectBeat={vi.fn()}
+        onPlayStoryboardMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={onAddMatchToTimeline}
+        onStoryboardPlayerRef={vi.fn()}
+        onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm vào timeline' }));
+
+    expect(onAddMatchToTimeline).toHaveBeenCalledTimes(1);
+    expect(onAddMatchToTimeline).toHaveBeenCalledWith(match);
   });
 });

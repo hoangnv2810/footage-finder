@@ -6,8 +6,9 @@ import { StoryboardBeatList } from '@/components/storyboard/StoryboardBeatList';
 import { StoryboardInputPanel } from '@/components/storyboard/StoryboardInputPanel';
 import { StoryboardPreviewPanel } from '@/components/storyboard/StoryboardPreviewPanel';
 import { StoryboardSourcePicker } from '@/components/storyboard/StoryboardSourcePicker';
+import { StoryboardTimelinePanel } from '@/components/storyboard/StoryboardTimelinePanel';
 import type { BeatMatchView, SourceVersionView, StoryboardBeatView } from '@/components/storyboard/types';
-import type { DatasetItem, ProductFolderSummary, SavedStoryboard, StoryboardMatch, StoryboardResult, StoryboardSource } from '@/lib/footage-app';
+import type { DatasetItem, ProductFolderSummary, SavedStoryboard, StoryboardMatch, StoryboardResult, StoryboardSource, StoryboardTimeline } from '@/lib/footage-app';
 
 interface StoryboardPageProps {
   storyboardFolder: ProductFolderSummary | null;
@@ -27,6 +28,11 @@ interface StoryboardPageProps {
   selectedSavedStoryboardId: string | null;
   selectedStoryboardBeatId: string | null;
   storyboardPreviewMatch: StoryboardMatch | null;
+  storyboardTimelines: StoryboardTimeline[];
+  selectedStoryboardTimelineId: string | null;
+  isLoadingStoryboardTimelines: boolean;
+  isMutatingStoryboardTimeline: boolean;
+  isExportingStoryboardTimeline: boolean;
   isGeneratingStoryboard: boolean;
   activeDataset: DatasetItem | null;
   activeDatasetUsableForStoryboard: boolean;
@@ -51,6 +57,16 @@ interface StoryboardPageProps {
   onSelectBeat: (beatId: string) => void;
   onPlayStoryboardMatch: (match: StoryboardMatch) => void;
   onTrimMatch: (match: StoryboardMatch) => void;
+  onCreateStoryboardTimeline: () => void;
+  onSelectStoryboardTimeline: (timelineId: string) => void;
+  onRenameStoryboardTimeline: (timelineId: string, name: string) => void;
+  onDeleteStoryboardTimeline: (timelineId: string) => void;
+  onAddStoryboardToTimeline: () => void;
+  onAddMatchToTimeline: (match: StoryboardMatch) => void;
+  onMoveTimelineClip: (clipId: string, direction: 'up' | 'down') => void;
+  onRemoveTimelineClip: (clipId: string) => void;
+  onClearTimelineClips: () => void;
+  onExportStoryboardTimeline: (timelineId: string) => void;
   onStoryboardPlayerRef: (el: HTMLVideoElement | null) => void;
   onStoryboardTimeUpdate: () => void;
   onResetStoryboard: () => void;
@@ -74,6 +90,11 @@ export function StoryboardPage({
   selectedSavedStoryboardId,
   selectedStoryboardBeatId,
   storyboardPreviewMatch,
+  storyboardTimelines,
+  selectedStoryboardTimelineId,
+  isLoadingStoryboardTimelines,
+  isMutatingStoryboardTimeline,
+  isExportingStoryboardTimeline,
   isGeneratingStoryboard,
   activeDataset,
   activeDatasetUsableForStoryboard,
@@ -98,6 +119,16 @@ export function StoryboardPage({
   onSelectBeat,
   onPlayStoryboardMatch,
   onTrimMatch,
+  onCreateStoryboardTimeline,
+  onSelectStoryboardTimeline,
+  onRenameStoryboardTimeline,
+  onDeleteStoryboardTimeline,
+  onAddStoryboardToTimeline,
+  onAddMatchToTimeline,
+  onMoveTimelineClip,
+  onRemoveTimelineClip,
+  onClearTimelineClips,
+  onExportStoryboardTimeline,
   onStoryboardPlayerRef,
   onStoryboardTimeUpdate,
   onResetStoryboard,
@@ -305,16 +336,39 @@ export function StoryboardPage({
           />
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-background overflow-hidden">
-          <StoryboardPreviewPanel
-            beat={selectedBeatView}
-            previewMatch={previewMatchView}
-            trimmingSceneId={toTrimMatchId(selectedBeatView, storyboardPreviewMatch?.id || null, trimmingScene)}
-            onPreviewMatch={(match) => onPlayStoryboardMatch(match.rawMatch)}
-            onTrimMatch={(match) => onTrimMatch(match.rawMatch)}
-            onPlayerRef={onStoryboardPlayerRef}
-            onTimeUpdate={onStoryboardTimeUpdate}
-          />
+        <div className="flex-1 flex flex-col xl:flex-row min-w-0 min-h-0 bg-background overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+            <StoryboardPreviewPanel
+              beat={selectedBeatView}
+              previewMatch={previewMatchView}
+              trimmingSceneId={toTrimMatchId(selectedBeatView, storyboardPreviewMatch?.id || null, trimmingScene)}
+              onPreviewMatch={(match) => onPlayStoryboardMatch(match.rawMatch)}
+              onTrimMatch={(match) => onTrimMatch(match.rawMatch)}
+              onAddMatchToTimeline={(match) => onAddMatchToTimeline(match.rawMatch)}
+              onPlayerRef={onStoryboardPlayerRef}
+              onTimeUpdate={onStoryboardTimeUpdate}
+            />
+          </div>
+
+          <div className="h-[280px] w-full shrink-0 border-t border-border bg-card p-2 min-h-0 overflow-hidden xl:h-auto xl:w-[300px] xl:border-l xl:border-t-0 xl:p-3 2xl:w-[340px]">
+            <StoryboardTimelinePanel
+              canUseTimeline={!!selectedSavedStoryboardId}
+              timelines={storyboardTimelines}
+              selectedTimelineId={selectedStoryboardTimelineId}
+              isLoading={isLoadingStoryboardTimelines}
+              isSaving={isMutatingStoryboardTimeline}
+              isExporting={isExportingStoryboardTimeline}
+              onCreateTimeline={onCreateStoryboardTimeline}
+              onSelectTimeline={onSelectStoryboardTimeline}
+              onRenameTimeline={onRenameStoryboardTimeline}
+              onDeleteTimeline={onDeleteStoryboardTimeline}
+              onAddStoryboard={onAddStoryboardToTimeline}
+              onMoveClip={onMoveTimelineClip}
+              onRemoveClip={onRemoveTimelineClip}
+              onClearClips={onClearTimelineClips}
+              onExport={onExportStoryboardTimeline}
+            />
+          </div>
         </div>
       </div>
   );

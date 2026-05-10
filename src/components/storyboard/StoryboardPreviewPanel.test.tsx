@@ -74,6 +74,7 @@ describe('StoryboardPreviewPanel', () => {
         trimmingSceneId={null}
         onPreviewMatch={vi.fn()}
         onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
         onPlayerRef={vi.fn()}
         onTimeUpdate={vi.fn()}
       />,
@@ -94,6 +95,7 @@ describe('StoryboardPreviewPanel', () => {
         trimmingSceneId={null}
         onPreviewMatch={vi.fn()}
         onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
         onPlayerRef={vi.fn()}
         onTimeUpdate={vi.fn()}
       />,
@@ -115,6 +117,7 @@ describe('StoryboardPreviewPanel', () => {
         trimmingSceneId={null}
         onPreviewMatch={vi.fn()}
         onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
         onPlayerRef={vi.fn()}
         onTimeUpdate={vi.fn()}
       />,
@@ -128,6 +131,7 @@ describe('StoryboardPreviewPanel', () => {
         trimmingSceneId={null}
         onPreviewMatch={vi.fn()}
         onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
         onPlayerRef={vi.fn()}
         onTimeUpdate={vi.fn()}
       />,
@@ -153,6 +157,7 @@ describe('StoryboardPreviewPanel', () => {
         trimmingSceneId={null}
         onPreviewMatch={vi.fn()}
         onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
         onPlayerRef={vi.fn()}
         onTimeUpdate={vi.fn()}
       />,
@@ -166,6 +171,7 @@ describe('StoryboardPreviewPanel', () => {
         trimmingSceneId={null}
         onPreviewMatch={vi.fn()}
         onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
         onPlayerRef={vi.fn()}
         onTimeUpdate={vi.fn()}
       />,
@@ -274,6 +280,7 @@ describe('StoryboardPreviewPanel', () => {
             trimmingSceneId={null}
             onPreviewMatch={vi.fn()}
             onTrimMatch={vi.fn()}
+            onAddMatchToTimeline={vi.fn()}
             onPlayerRef={setPlayer}
             onTimeUpdate={vi.fn()}
           />
@@ -345,7 +352,7 @@ describe('StoryboardPreviewPanel', () => {
     }
   });
 
-  it('plays the matching scene when clicking anywhere on a footage match item', () => {
+  it('plays the matching scene from the explicit preview action', () => {
     const onPreviewMatch = vi.fn();
 
     render(
@@ -355,14 +362,58 @@ describe('StoryboardPreviewPanel', () => {
         trimmingSceneId={null}
         onPreviewMatch={onPreviewMatch}
         onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
         onPlayerRef={vi.fn()}
         onTimeUpdate={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByText('Khớp với cảnh quay sản phẩm'));
+    fireEvent.click(screen.getByRole('button', { name: 'Xem' }));
 
     expect(onPreviewMatch).toHaveBeenCalledTimes(1);
     expect(onPreviewMatch).toHaveBeenCalledWith(match);
+  });
+
+  it('does not preview when pressing Enter on the add-to-timeline action', () => {
+    const onPreviewMatch = vi.fn();
+
+    render(
+      <StoryboardPreviewPanel
+        beat={beat}
+        previewMatch={null}
+        trimmingSceneId={null}
+        onPreviewMatch={onPreviewMatch}
+        onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
+        onPlayerRef={vi.fn()}
+        onTimeUpdate={vi.fn()}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Thêm vào timeline' }), { key: 'Enter' });
+
+    expect(onPreviewMatch).not.toHaveBeenCalled();
+  });
+
+  it('adds a footage match to the timeline from the match card action', () => {
+    const onAddMatchToTimeline = vi.fn();
+
+    render(
+      <StoryboardPreviewPanel
+        beat={beat}
+        previewMatch={null}
+        trimmingSceneId={null}
+        onPreviewMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={onAddMatchToTimeline}
+        onPlayerRef={vi.fn()}
+        onTimeUpdate={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm vào timeline' }));
+
+    expect(onAddMatchToTimeline).toHaveBeenCalledTimes(1);
+    expect(onAddMatchToTimeline).toHaveBeenCalledWith(match);
   });
 });

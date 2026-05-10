@@ -9,11 +9,12 @@ interface StoryboardPreviewPanelProps {
   trimmingSceneId: string | null;
   onPreviewMatch: (match: BeatMatchView) => void;
   onTrimMatch: (match: BeatMatchView) => void;
+  onAddMatchToTimeline: (match: BeatMatchView) => void;
   onPlayerRef: (node: HTMLVideoElement | null) => void;
   onTimeUpdate: () => void;
 }
 
-export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, onPreviewMatch, onTrimMatch, onPlayerRef, onTimeUpdate }: StoryboardPreviewPanelProps) {
+export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, onPreviewMatch, onTrimMatch, onAddMatchToTimeline, onPlayerRef, onTimeUpdate }: StoryboardPreviewPanelProps) {
   if (!beat) {
     return (
       <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
@@ -46,11 +47,11 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
       ) : null}
 
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
-        <div className="grid h-full min-h-0 grid-cols-[minmax(360px,44%)_minmax(340px,56%)] overflow-hidden">
-          <div className="min-h-0 border-r border-border bg-card/30">
-            <div className="flex h-full min-h-0 items-center justify-center p-4 overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          <div className="h-[220px] shrink-0 border-b border-border bg-card/30">
+            <div className="flex h-full min-h-0 items-center justify-center p-3 overflow-hidden">
               {previewMatch ? (
-                <div className="rounded-lg bg-black/40 overflow-hidden w-full max-w-[360px]">
+                <div className="rounded-lg bg-black/40 overflow-hidden h-full max-h-full">
                   <video
                     key={previewMatch.fileName}
                     ref={onPlayerRef}
@@ -58,7 +59,7 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
                     preload="auto"
                     onTimeUpdate={onTimeUpdate}
                     controls
-                    className="aspect-[9/16] w-full bg-black object-contain"
+                    className="h-full bg-black object-contain"
                   />
                 </div>
               ) : (
@@ -80,6 +81,7 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
                     isActive={previewMatch?.id === match.id}
                     onPreview={() => onPreviewMatch(match)}
                     onTrim={() => onTrimMatch(match)}
+                    onAddToTimeline={() => onAddMatchToTimeline(match)}
                     isTrimming={trimmingSceneId === match.id}
                   />
                 ))

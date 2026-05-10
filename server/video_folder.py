@@ -31,13 +31,22 @@ def scan_folder() -> list[dict]:
 
 def get_video_path(filename: str) -> Path:
     """Resolve a filename within VIDEO_FOLDER, preventing path traversal."""
-    folder = get_video_folder()
+    folder = get_video_folder().resolve()
     path = (folder / filename).resolve()
-    if not str(path).startswith(str(folder.resolve())):
-        raise ValueError("Invalid filename")
+    try:
+        path.relative_to(folder)
+    except ValueError as exc:
+        raise ValueError("Invalid filename") from exc
     if not path.is_file():
         raise FileNotFoundError(f"Video not found: {filename}")
     return path
+
+
+def _ensure_path_in_video_folder(path: Path) -> None:
+    try:
+        path.resolve().relative_to(get_video_folder().resolve())
+    except ValueError as exc:
+        raise ValueError("Invalid filename") from exc
 
 
 def validate_video_filename(filename: str) -> str:
@@ -58,8 +67,10 @@ def rename_video_file(old_filename: str, new_filename: str) -> str:
         raise ValueError("Tên file mới phải khác tên hiện tại")
 
     destination = (get_video_folder() / normalized_new_name).resolve()
-    if not str(destination).startswith(str(get_video_folder().resolve())):
-        raise ValueError("Tên file không hợp lệ")
+    try:
+        _ensure_path_in_video_folder(destination)
+    except ValueError as exc:
+        raise ValueError("Tên file không hợp lệ") from exc
     if destination.exists():
         raise FileExistsError(f"Video already exists: {normalized_new_name}")
 

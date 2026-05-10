@@ -358,6 +358,29 @@ def init_db() -> None:
             source TEXT NOT NULL DEFAULT 'generated',
             folder_id INTEGER
         );
+
+        CREATE TABLE IF NOT EXISTS storyboard_timeline (
+            id TEXT PRIMARY KEY,
+            storyboard_id TEXT NOT NULL REFERENCES storyboard_project(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS storyboard_timeline_clip (
+            id TEXT PRIMARY KEY,
+            timeline_id TEXT NOT NULL REFERENCES storyboard_timeline(id) ON DELETE CASCADE,
+            beat_id TEXT,
+            label TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            start REAL NOT NULL,
+            end REAL NOT NULL,
+            scene_index INTEGER,
+            position INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
     """
     )
 
@@ -1065,6 +1088,14 @@ def _new_storyboard_id() -> str:
     return f"storyboard-{uuid.uuid4().hex}"
 
 
+def _new_storyboard_timeline_id() -> str:
+    return f"storyboard-timeline-{uuid.uuid4().hex}"
+
+
+def _new_storyboard_timeline_clip_id() -> str:
+    return f"storyboard-timeline-clip-{uuid.uuid4().hex}"
+
+
 def _safe_json_value(raw: str, fallback: Any, expected_type: type) -> Any:
     try:
         value = json.loads(raw)
@@ -1194,8 +1225,220 @@ def get_storyboard_project(storyboard_id: str) -> dict | None:
     return _storyboard_row_to_dict(row, include_result=True)
 
 
+def _storyboard_timeline_clip_row_to_dict(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "timelineId": row["timeline_id"],
+        "beatId": row["beat_id"],
+        "label": row["label"],
+        "filename": row["filename"],
+        "start": row["start"],
+        "end": row["end"],
+        "sceneIndex": row["scene_index"],
+        "position": row["position"],
+        "createdAt": row["created_at"],
+        "updatedAt": row["updated_at"],
+    }
+
+
+def _storyboard_timeline_row_to_dict(
+    row: sqlite3.Row, clips: list[dict] | None = None
+) -> dict:
+    return {
+        "id": row["id"],
+        "storyboardId": row["storyboard_id"],
+        "name": row["name"],
+        "position": row["position"],
+        "createdAt": row["created_at"],
+        "updatedAt": row["updated_at"],
+        "clips": clips or [],
+    }
+
+
+def _load_storyboard_timeline_clips(
+    conn: sqlite3.Connection, timeline_ids: list[str]
+) -> dict[str, list[dict]]:
+    if not timeline_ids:
+        return {}
+    placeholders = ",".join("?" for _ in timeline_ids)
+    rows = conn.execute(
+        f"""
+        SELECT * FROM storyboard_timeline_clip
+        WHERE timeline_id IN ({placeholders})
+        ORDER BY position ASC, created_at ASC, id ASC
+        """,
+        timeline_ids,
+    ).fetchall()
+    clips_by_timeline = {timeline_id: [] for timeline_id in timeline_ids}
+    for row in rows:
+        clips_by_timeline[row["timeline_id"]].append(
+            _storyboard_timeline_clip_row_to_dict(row)
+        )
+    return clips_by_timeline
+
+
+def list_storyboard_timelines(storyboard_id: str) -> list[dict]:
+    conn = _get_conn()
+    rows = conn.execute(
+        """
+        SELECT * FROM storyboard_timeline
+        WHERE storyboard_id = ?
+        ORDER BY position ASC, created_at ASC, id ASC
+        """,
+        (storyboard_id,),
+    ).fetchall()
+    timeline_ids = [row["id"] for row in rows]
+    clips_by_timeline = _load_storyboard_timeline_clips(conn, timeline_ids)
+    return [
+        _storyboard_timeline_row_to_dict(row, clips_by_timeline.get(row["id"], []))
+        for row in rows
+    ]
+
+
+def get_storyboard_timeline(timeline_id: str) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT * FROM storyboard_timeline WHERE id = ?", (timeline_id,)
+    ).fetchone()
+    if not row:
+        return None
+    clips_by_timeline = _load_storyboard_timeline_clips(conn, [timeline_id])
+    return _storyboard_timeline_row_to_dict(
+        row, clips_by_timeline.get(timeline_id, [])
+    )
+
+
+def create_storyboard_timeline(
+    storyboard_id: str, name: str | None = None
+) -> dict | None:
+    conn = _get_conn()
+    storyboard = conn.execute(
+        "SELECT id FROM storyboard_project WHERE id = ?", (storyboard_id,)
+    ).fetchone()
+    if not storyboard:
+        return None
+
+    row = conn.execute(
+        "SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM storyboard_timeline WHERE storyboard_id = ?",
+        (storyboard_id,),
+    ).fetchone()
+    position = row["next_position"]
+    now = int(time.time() * 1000)
+    timeline_id = _new_storyboard_timeline_id()
+    conn.execute(
+        """
+        INSERT INTO storyboard_timeline (id, storyboard_id, name, position, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (timeline_id, storyboard_id, name or f"Version {position + 1}", position, now, now),
+    )
+    conn.commit()
+    return get_storyboard_timeline(timeline_id)
+
+
+def update_storyboard_timeline(
+    timeline_id: str, payload: dict[str, Any]
+) -> dict | None:
+    conn = _get_conn()
+    existing = conn.execute(
+        "SELECT id FROM storyboard_timeline WHERE id = ?", (timeline_id,)
+    ).fetchone()
+    if not existing:
+        return None
+
+    updates = []
+    values: list[Any] = []
+    if "name" in payload:
+        updates.append("name = ?")
+        values.append(str(payload.get("name") or ""))
+    if "position" in payload:
+        updates.append("position = ?")
+        values.append(int(payload["position"]))
+    if not updates:
+        return get_storyboard_timeline(timeline_id)
+
+    updates.append("updated_at = ?")
+    values.append(int(time.time() * 1000))
+    values.append(timeline_id)
+    conn.execute(
+        f"UPDATE storyboard_timeline SET {', '.join(updates)} WHERE id = ?", values
+    )
+    conn.commit()
+    return get_storyboard_timeline(timeline_id)
+
+
+def delete_storyboard_timeline(timeline_id: str) -> bool:
+    conn = _get_conn()
+    conn.execute(
+        "DELETE FROM storyboard_timeline_clip WHERE timeline_id = ?", (timeline_id,)
+    )
+    cur = conn.execute("DELETE FROM storyboard_timeline WHERE id = ?", (timeline_id,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def replace_storyboard_timeline_clips(
+    timeline_id: str, clips: list[dict]
+) -> dict | None:
+    conn = _get_conn()
+    timeline = conn.execute(
+        "SELECT id FROM storyboard_timeline WHERE id = ?", (timeline_id,)
+    ).fetchone()
+    if not timeline:
+        return None
+
+    now = int(time.time() * 1000)
+    rows = []
+    for position, clip in enumerate(clips):
+        rows.append(
+            (
+                _new_storyboard_timeline_clip_id(),
+                timeline_id,
+                clip.get("beat_id") or clip.get("beatId"),
+                clip.get("label") or "",
+                clip.get("filename") or clip.get("fileName") or "",
+                float(clip.get("start") or 0),
+                float(clip.get("end") or 0),
+                clip.get("scene_index") if "scene_index" in clip else clip.get("sceneIndex"),
+                position,
+                now,
+                now,
+            )
+        )
+
+    conn.execute(
+        "DELETE FROM storyboard_timeline_clip WHERE timeline_id = ?", (timeline_id,)
+    )
+    for row in rows:
+        conn.execute(
+            """
+            INSERT INTO storyboard_timeline_clip (
+                id, timeline_id, beat_id, label, filename, start, end, scene_index,
+                position, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            row,
+        )
+    conn.execute(
+        "UPDATE storyboard_timeline SET updated_at = ? WHERE id = ?", (now, timeline_id)
+    )
+    conn.commit()
+    return get_storyboard_timeline(timeline_id)
+
+
 def delete_storyboard_project(storyboard_id: str) -> bool:
     conn = _get_conn()
+    timeline_rows = conn.execute(
+        "SELECT id FROM storyboard_timeline WHERE storyboard_id = ?", (storyboard_id,)
+    ).fetchall()
+    timeline_ids = [row["id"] for row in timeline_rows]
+    if timeline_ids:
+        placeholders = ",".join("?" for _ in timeline_ids)
+        conn.execute(
+            f"DELETE FROM storyboard_timeline_clip WHERE timeline_id IN ({placeholders})",
+            timeline_ids,
+        )
+    conn.execute("DELETE FROM storyboard_timeline WHERE storyboard_id = ?", (storyboard_id,))
     cur = conn.execute("DELETE FROM storyboard_project WHERE id = ?", (storyboard_id,))
     conn.commit()
     return cur.rowcount > 0
