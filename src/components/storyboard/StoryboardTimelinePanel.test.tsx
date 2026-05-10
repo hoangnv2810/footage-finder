@@ -76,8 +76,18 @@ describe('StoryboardTimelinePanel', () => {
     expect(screen.getAllByText('Bản dựng chính').length).toBeGreaterThan(0);
     expect(screen.getAllByText('1 clip · 0:03').length).toBeGreaterThan(0);
     expect(screen.getByText('Hook')).toBeInTheDocument();
-    expect(screen.getByText('hook-demo.mp4')).toBeInTheDocument();
+    expect(screen.queryByText('hook-demo.mp4')).not.toBeInTheDocument();
     expect(screen.getByText('0:01 - 0:04')).toBeInTheDocument();
+
+    const clipItem = screen.getByTestId('timeline-clip-item-clip-1');
+    expect(clipItem).toHaveClass('rounded-md', 'border', 'border-border/60', 'bg-background/25', 'px-2.5', 'py-2');
+    expect(clipItem).not.toHaveClass('border-l-primary/60');
+    expect(screen.getByTestId('timeline-clip-title-row-clip-1')).toContainElement(screen.getByRole('button', { name: 'Đưa Hook lên' }));
+    expect(screen.getByTestId('timeline-clip-index-clip-1')).toHaveClass('rounded', 'border', 'border-primary/30', 'bg-primary/10', 'text-primary');
+    expect(screen.getByTestId('timeline-clip-index-clip-1')).not.toHaveClass('rounded-full');
+    expect(screen.getByTestId('timeline-clip-time-clip-1')).toHaveClass('rounded', 'bg-secondary/50', 'px-1.5', 'py-0.5');
+    expect(screen.getByTestId('timeline-clip-time-clip-1')).not.toHaveClass('rounded-full');
+    expect(screen.getByRole('button', { name: 'Đưa Hook lên' })).toHaveClass('h-6', 'w-6');
   });
 
   it('creates a named timeline from the modal and can request quick creation', () => {
@@ -126,7 +136,7 @@ describe('StoryboardTimelinePanel', () => {
     expect(screen.getByRole('button', { name: 'Xuất clip rời (.zip)' })).toBeDisabled();
   });
 
-  it('moves and removes clips from action buttons', () => {
+  it('moves clips from action buttons and confirms before removing', () => {
     const onMoveClip = vi.fn();
     const onRemoveClip = vi.fn();
     renderPanel({ onMoveClip, onRemoveClip });
@@ -135,7 +145,24 @@ describe('StoryboardTimelinePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Xoá Hook khỏi timeline' }));
 
     expect(onMoveClip).toHaveBeenCalledWith('clip-1', 'down');
+    expect(onRemoveClip).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Xóa clip khỏi timeline' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveTextContent('Bạn muốn xóa clip Hook khỏi timeline?');
+    expect(screen.getByText(/Clip này chỉ bị xóa khỏi bản dựng/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa' }));
+
     expect(onRemoveClip).toHaveBeenCalledWith('clip-1');
+  });
+
+  it('does not remove a clip when cancelling the remove confirmation', () => {
+    const onRemoveClip = vi.fn();
+    renderPanel({ onRemoveClip });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xoá Hook khỏi timeline' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
+
+    expect(onRemoveClip).not.toHaveBeenCalled();
   });
 
   it('disables timeline mutations while saving', () => {
