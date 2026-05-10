@@ -1017,10 +1017,22 @@ function WorkspaceApp() {
 
     const newClip = matchToTimelineClipInput(match, `Beat ${timeline.clips.length + 1}`);
     const isDuplicate = timeline.clips.some((clip) => isSameTimelineClip(clip, newClip));
-    if (isDuplicate) return;
+    if (isDuplicate) {
+      toast('Clip đã tồn tại trong timeline.', {
+        icon: '⚠️',
+        // light orange background + dark orange text
+        style: { background: '#FFEDD5', color: '#7C2D12' },
+      });
+      return;
+    }
 
     try {
-      await persistTimelineClips(timeline.id, [...timeline.clips.map(timelineClipToInput), newClip]);
+      const updated = await persistTimelineClips(timeline.id, [...timeline.clips.map(timelineClipToInput), newClip]);
+      if (updated) {
+        setStoryboardPreviewMatch(match);
+        setSelectedStoryboardBeatId(match.beatId || null);
+        toast.success('Đã thêm clip vào timeline.');
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể thêm clip vào timeline.');
     }
