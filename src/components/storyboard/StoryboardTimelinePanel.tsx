@@ -6,9 +6,11 @@ export interface StoryboardTimelinePanelProps {
   canUseTimeline: boolean;
   timelines: StoryboardTimeline[];
   selectedTimelineId: string | null;
+  isCollapsed: boolean;
   isLoading: boolean;
   isSaving: boolean;
   isExporting: boolean;
+  onToggleCollapsed: () => void;
   onCreateTimeline: () => void;
   onSelectTimeline: (timelineId: string) => void;
   onRenameTimeline: (timelineId: string, name: string) => void;
@@ -34,9 +36,11 @@ export function StoryboardTimelinePanel({
   canUseTimeline,
   timelines,
   selectedTimelineId,
+  isCollapsed,
   isLoading,
   isSaving,
   isExporting,
+  onToggleCollapsed,
   onCreateTimeline,
   onSelectTimeline,
   onRenameTimeline,
@@ -66,8 +70,28 @@ export function StoryboardTimelinePanel({
     );
   }
 
+  if (isCollapsed) {
+    return (
+      <section className="flex h-full min-h-0 items-stretch overflow-hidden rounded-md border border-border bg-card/60">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-label="Mở timeline bản dựng"
+          className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-between gap-3 px-2 py-3 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] [writing-mode:vertical-rl]">
+            Timeline
+          </span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
+            {clipCount}
+          </span>
+        </button>
+      </section>
+    );
+  }
+
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border bg-card/50">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-md bg-card/50">
       <div className="border-b border-border px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -77,6 +101,13 @@ export function StoryboardTimelinePanel({
             </p>
           </div>
 
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="shrink-0 rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-surface-hover"
+          >
+            Thu gọn
+          </button>
           <button
             type="button"
             onClick={onCreateTimeline}
@@ -160,14 +191,14 @@ export function StoryboardTimelinePanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 custom-scrollbar">
         {selectedTimeline && selectedTimeline.clips.length > 0 ? (
-          <ol className="space-y-2">
+          <ol className="divide-y divide-border/60 overflow-hidden rounded-md border border-border/60">
             {selectedTimeline.clips.map((clip, index) => {
               const clipStart = toTimelineSeconds(clip.start);
               const clipEnd = Math.max(clipStart, toTimelineSeconds(clip.end));
               const clipDuration = clipEnd - clipStart;
 
               return (
-                <li key={clip.id} className="rounded-md border border-border bg-background/60 p-3">
+                <li key={clip.id} className="bg-background/35 p-3 transition-colors hover:bg-background/60">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">

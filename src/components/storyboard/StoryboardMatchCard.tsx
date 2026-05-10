@@ -16,7 +16,8 @@ interface StoryboardMatchCardProps {
 export function StoryboardMatchCard({ match, isActive, onPreview, onTrim, onAddToTimeline, isTrimming }: StoryboardMatchCardProps) {
   return (
     <div
-      className={cn('rounded-lg border p-3 transition-colors', isActive ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-border/80 hover:bg-surface-hover')}
+      onClick={onPreview}
+      className={cn('cursor-pointer rounded-lg border p-3 transition-colors', isActive ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-border/80 hover:bg-surface-hover')}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -43,21 +44,30 @@ export function StoryboardMatchCard({ match, isActive, onPreview, onTrim, onAddT
       <div className="flex items-center gap-1.5 flex-wrap">
         <button
           type="button"
-          onClick={onPreview}
+          onClick={(event) => {
+            event.stopPropagation();
+            onPreview();
+          }}
           className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors"
         >
           <Eye className="h-3 w-3" /> Xem
         </button>
         <button
           type="button"
-          onClick={onTrim}
+          onClick={(event) => {
+            event.stopPropagation();
+            onTrim();
+          }}
           className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors"
         >
           <Download className={`h-3 w-3 ${isTrimming ? 'animate-pulse' : ''}`} /> Cắt & tải
         </button>
         <button
           type="button"
-          onClick={onAddToTimeline}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddToTimeline();
+          }}
           className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors"
         >
           <Plus className="h-3 w-3" /> Thêm vào timeline

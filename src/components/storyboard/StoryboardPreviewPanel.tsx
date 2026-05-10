@@ -47,11 +47,14 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
       ) : null}
 
       <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-          <div className="h-[220px] shrink-0 border-b border-border bg-card/30">
+        <div
+          data-testid="storyboard-preview-match-layout"
+          className="grid h-full min-h-0 grid-cols-1 overflow-hidden xl:grid-cols-[minmax(260px,42%)_minmax(320px,58%)]"
+        >
+          <div className="h-[220px] shrink-0 border-b border-border bg-card/30 xl:h-full xl:min-h-0 xl:border-b-0 xl:border-r">
             <div className="flex h-full min-h-0 items-center justify-center p-3 overflow-hidden">
               {previewMatch ? (
-                <div className="rounded-lg bg-black/40 overflow-hidden h-full max-h-full">
+                <div className="rounded-lg bg-black/40 overflow-hidden h-full max-h-full xl:max-h-[calc(100%-1rem)]">
                   <video
                     key={previewMatch.fileName}
                     ref={onPlayerRef}

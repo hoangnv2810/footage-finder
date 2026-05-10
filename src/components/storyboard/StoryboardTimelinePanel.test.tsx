@@ -53,6 +53,8 @@ const renderPanel = (overrides: Partial<React.ComponentProps<typeof StoryboardTi
     onRemoveClip: vi.fn(),
     onClearClips: vi.fn(),
     onExport: vi.fn(),
+    isCollapsed: false,
+    onToggleCollapsed: vi.fn(),
     ...overrides,
   };
 
@@ -140,5 +142,18 @@ describe('StoryboardTimelinePanel', () => {
     expect(onAddStoryboard).not.toHaveBeenCalled();
     expect(onMoveClip).not.toHaveBeenCalled();
     expect(onRemoveClip).not.toHaveBeenCalled();
+  });
+
+  it('renders a compact vertical rail when collapsed', () => {
+    const onToggleCollapsed = vi.fn();
+    renderPanel({ isCollapsed: true, onToggleCollapsed });
+
+    expect(screen.getByRole('button', { name: 'Mở timeline bản dựng' })).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Xuất clip rời (.zip)' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mở timeline bản dựng' }));
+
+    expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
   });
 });

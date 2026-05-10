@@ -1,179 +1,226 @@
-# Storyboard Timeline Export Design
+# Thiết Kế Bản Dựng Timeline Và Xuất Clip Cho Storyboard
 
-## Goal
+## Mục Tiêu
 
-Add a saved-storyboard timeline so each saved storyboard can keep its own selected clips and export them as separate MP4 files in a ZIP. The workflow is: write/import script, generate storyboard, choose footage matches, review the storyboard timeline, export the clips, then continue editing in CapCut or another editor.
+Thêm nhiều bản dựng timeline cho từng storyboard đã lưu để một storyboard có thể tạo nhiều phương án video khác nhau từ các footage match. Mỗi bản dựng giữ danh sách clip riêng và xuất thành nhiều file MP4 rời trong một file ZIP. Luồng làm việc là: viết hoặc import kịch bản, tạo storyboard, chọn footage match, tạo một hoặc nhiều bản dựng, kiểm tra timeline của bản dựng, xuất clip rời, rồi kéo sang CapCut hoặc phần mềm dựng khác để edit tiếp.
 
-## Scope
+## Phạm Vi
 
-This design covers the first implementation of timeline export for saved storyboards only.
+Thiết kế này chỉ bao gồm phiên bản đầu của tính năng bản dựng timeline và export clip rời cho storyboard đã lưu.
 
-Included:
+Bao gồm:
 
-- One timeline per saved storyboard.
-- Timeline persistence in SQLite.
-- Adding selected storyboard matches to the timeline.
-- Reordering and removing timeline clips.
-- Exporting timeline clips as a ZIP of separate MP4 files.
-- Export filenames containing order, label, source video, and time range.
+- Nhiều bản dựng timeline cho mỗi storyboard đã lưu.
+- Lưu timeline vào SQLite.
+- Thêm match đã chọn từ storyboard vào timeline.
+- Tạo, chọn, đổi tên và xoá bản dựng timeline.
+- Đổi thứ tự và xoá clip trong timeline.
+- Xuất từng bản dựng timeline thành file `.zip` gồm nhiều file MP4 rời.
+- Tên file export có thứ tự, label, video gốc và khoảng thời gian.
 
-Not included in this version:
+Không bao gồm trong phiên bản này:
 
-- A global clip basket shared by Search, Library, and Storyboard.
-- Concatenating clips into one final video.
-- Multi-track editing, transitions, audio mixing, subtitles, or overlays.
-- Timeline support for unsaved storyboard drafts.
+- Giỏ clip global dùng chung cho Search, Library và Storyboard.
+- Ghép tất cả clip thành một video hoàn chỉnh.
+- Multi-track editing, transition, mix âm thanh, phụ đề hoặc overlay.
+- Bản dựng timeline cho storyboard nháp chưa lưu.
 
-## Product Behavior
+## Hành Vi Sản Phẩm
 
-Each saved storyboard owns a separate timeline. When the user selects saved storyboard A, the app loads timeline A. When the user selects saved storyboard B, the app loads timeline B. Export only uses the timeline of the currently selected storyboard.
+Mỗi storyboard đã lưu có thể sở hữu nhiều bản dựng timeline. Khi người dùng chọn storyboard A, app load danh sách bản dựng của storyboard A và chọn bản dựng gần nhất hoặc bản dựng đầu tiên. Khi chọn storyboard B, app load danh sách bản dựng của storyboard B. Nút export chỉ xuất bản dựng timeline đang được chọn.
 
-Timeline features:
+Bản dựng timeline cần hỗ trợ:
 
-- Show timeline clips in order.
-- Add a match from the currently viewed beat.
-- Add the whole storyboard to timeline.
-- Move clips up or down.
-- Remove clips.
-- Clear the timeline.
-- Export the timeline as `.zip`.
+- Tạo bản dựng mới cho storyboard đang mở.
+- Chọn bản dựng đang làm việc.
+- Đổi tên bản dựng.
+- Xoá bản dựng.
+- Hiển thị danh sách clip theo thứ tự.
+- Thêm một match từ beat đang xem.
+- Đưa toàn bộ storyboard vào bản dựng timeline.
+- Di chuyển clip lên hoặc xuống.
+- Xoá từng clip.
+- Xoá toàn bộ clip trong bản dựng.
+- Xuất bản dựng thành `.zip`.
 
-Unsaved generated storyboards should not silently create a timeline. If a storyboard has not been saved/imported and has no `storyboard_id`, show a Vietnamese prompt such as `Lưu storyboard để tạo timeline`.
+Storyboard mới generate nhưng chưa lưu không được âm thầm tạo bản dựng timeline. Nếu storyboard chưa có `storyboard_id`, UI hiển thị thông báo tiếng Việt như `Lưu storyboard để tạo bản dựng`.
 
-## Match Selection Rules
+## Quy Tắc Chọn Match
 
-For `Đưa storyboard vào timeline`, the app adds one clip per beat in beat order.
+Với thao tác `Đưa storyboard vào timeline`, app thêm một clip cho mỗi beat vào bản dựng đang chọn theo đúng thứ tự beat.
 
-Selection priority:
+Thứ tự ưu tiên khi chọn match:
 
-1. Use the match currently selected/previewed for that beat if available.
-2. Otherwise use the first match for that beat.
-3. Skip beats with no matches.
+1. Dùng match đang được chọn hoặc preview cho beat đó nếu có.
+2. Nếu chưa có match được chọn, dùng match đầu tiên của beat.
+3. Bỏ qua beat không có match.
 
-If a clip already exists for the same `beat_id` and same `filename/start/end`, do not add a duplicate. If the user chooses a different match for the same beat, allow it as a separate timeline clip because users may want alternates.
+Nếu bản dựng đang chọn đã có clip trùng `beat_id` và trùng `filename/start/end`, không thêm bản sao. Nếu người dùng chọn một match khác cho cùng beat, vẫn cho thêm như một clip riêng vì họ có thể muốn giữ nhiều phương án footage trong cùng bản dựng.
 
-## Data Model
+## Mô Hình Dữ Liệu
 
-Add a `storyboard_timeline_clip` table.
+Thêm bảng `storyboard_timeline` và `storyboard_timeline_clip`.
 
-Columns:
+### `storyboard_timeline`
+
+Các cột:
 
 - `id`: text primary key.
-- `storyboard_id`: text, required, references `storyboard_project.id`.
-- `beat_id`: text, nullable because imported data may be incomplete.
-- `label`: text, required.
-- `filename`: text, required.
-- `start`: real, required.
-- `end`: real, required.
-- `scene_index`: integer, nullable.
-- `position`: integer, required.
+- `storyboard_id`: text, bắt buộc, tham chiếu `storyboard_project.id`.
+- `name`: text, bắt buộc, ví dụ `Bản dựng 1`.
+- `position`: integer, bắt buộc, dùng để sắp xếp danh sách bản dựng.
 - `created_at`: text timestamp.
 - `updated_at`: text timestamp.
 
-Deleting a storyboard should delete its timeline clips. If SQLite foreign-key cascade is not already consistently enabled, delete timeline rows explicitly in `delete_storyboard_project`.
+### `storyboard_timeline_clip`
+
+Các cột:
+
+- `id`: text primary key.
+- `timeline_id`: text, bắt buộc, tham chiếu `storyboard_timeline.id`.
+- `beat_id`: text, có thể null vì dữ liệu import có thể thiếu.
+- `label`: text, bắt buộc.
+- `filename`: text, bắt buộc.
+- `start`: real, bắt buộc.
+- `end`: real, bắt buộc.
+- `scene_index`: integer, có thể null.
+- `position`: integer, bắt buộc.
+- `created_at`: text timestamp.
+- `updated_at`: text timestamp.
+
+Khi xoá storyboard, toàn bộ bản dựng timeline và timeline clip của storyboard đó cũng phải bị xoá. Nếu SQLite foreign-key cascade chưa được bật ổn định, xoá timeline clip và timeline trực tiếp trong `delete_storyboard_project`.
 
 ## Backend API
 
-Add endpoints under the existing FastAPI backend.
+Thêm các endpoint vào FastAPI backend hiện tại.
 
-`GET /api/storyboards/{storyboard_id}/timeline`
+`GET /api/storyboards/{storyboard_id}/timelines`
 
-Returns timeline clips ordered by `position`.
+Trả về danh sách bản dựng của storyboard, mỗi bản dựng gồm metadata và clip đã sắp xếp theo `position`.
 
-`PUT /api/storyboards/{storyboard_id}/timeline`
+`POST /api/storyboards/{storyboard_id}/timelines`
 
-Replaces the timeline with the provided ordered clip list. This keeps reorder, add, remove, and clear simple and avoids partial update drift.
+Tạo bản dựng mới cho storyboard. Nếu frontend không gửi tên, backend dùng tên mặc định như `Bản dựng 1`, `Bản dựng 2`.
 
-`POST /api/storyboards/{storyboard_id}/timeline/export`
+`PATCH /api/storyboard-timelines/{timeline_id}`
 
-Exports the current timeline as a ZIP. The server trims each clip with the existing ffmpeg trimming helper, writes each MP4 to a temporary directory, zips the files, and returns a `FileResponse` with cleanup via `BackgroundTask`.
+Đổi tên hoặc đổi thứ tự bản dựng.
+
+`DELETE /api/storyboard-timelines/{timeline_id}`
+
+Xoá một bản dựng và toàn bộ clip trong bản dựng đó.
+
+`PUT /api/storyboard-timelines/{timeline_id}/clips`
+
+Thay toàn bộ clip của bản dựng bằng danh sách clip đã được sắp thứ tự từ frontend. Cách này giúp thao tác thêm, xoá, đổi thứ tự và xoá hết đơn giản hơn, tránh lệch trạng thái giữa client và server.
+
+`POST /api/storyboard-timelines/{timeline_id}/export`
+
+Xuất bản dựng timeline hiện tại thành file ZIP. Server đọc các clip trong timeline, dùng helper ffmpeg trim hiện có để cắt từng clip, ghi MP4 vào thư mục tạm, nén thành ZIP, rồi trả về `FileResponse` và dọn thư mục tạm bằng `BackgroundTask`.
 
 Validation:
 
-- Return 404 if the storyboard does not exist.
-- Return 400 if the timeline is empty when exporting.
-- Return 400 for invalid clip ranges where `end <= start`.
-- Return 500-style error response consistent with `/api/trim` if ffmpeg is unavailable.
-- Resolve video paths through `get_video_path` so `VIDEO_FOLDER` rules stay centralized.
+- Trả 404 nếu storyboard không tồn tại.
+- Trả 404 nếu timeline không tồn tại.
+- Trả 400 nếu bản dựng timeline rỗng khi export.
+- Trả 400 nếu clip có khoảng thời gian không hợp lệ, ví dụ `end <= start`.
+- Trả lỗi nhất quán với `/api/trim` nếu server không có ffmpeg.
+- Luôn resolve video path qua `get_video_path` để giữ logic `VIDEO_FOLDER` tập trung một chỗ.
 
-## Export Filename Format
+## Format Tên File Export
 
-Use this format:
+Tên file ZIP nên dùng format:
+
+`ten-storyboard-ten-ban-dung-clips.zip`
+
+Ví dụ:
+
+`kem-tri-nam-version-1-clips.zip`
+
+Tên clip bên trong ZIP dùng format:
 
 `01_hook_videoA_00-12_00-18.mp4`
 
-Rules:
+Quy tắc:
 
-- Prefix is 1-based timeline order, zero-padded to two digits until 99 clips.
-- Label comes from beat label or match label.
-- Source video is the original filename without extension.
-- Time range uses `MM-SS` for both start and end.
-- Sanitize all filename parts to safe ASCII-ish slug text.
-- If label is missing, use `beat-1`, `beat-2`, etc.
+- Prefix là thứ tự timeline bắt đầu từ 1, pad 2 chữ số cho tới 99 clip.
+- Label lấy từ beat label hoặc match label.
+- Tên video gốc là filename bỏ phần extension.
+- Khoảng thời gian dùng dạng `MM-SS` cho cả start và end.
+- Sanitize mọi phần tên file thành slug an toàn, ưu tiên ASCII.
+- Nếu thiếu label, dùng `beat-1`, `beat-2`, v.v.
 
 ## Frontend UI
 
-Add a Storyboard timeline panel in `StoryboardPage` near the preview/result area.
+Thêm panel Bản dựng/Timeline trong `StoryboardPage`, đặt gần khu vực preview/kết quả storyboard.
 
-The panel shows:
+Panel hiển thị:
 
-- Timeline title and clip count.
-- Total duration.
-- Clip rows with order, label, filename, time range, and duration.
-- Up/down controls for reorder.
-- Remove control.
-- `Đưa storyboard vào timeline` action.
-- `Xuất clip rời (.zip)` action.
+- Danh sách hoặc dropdown bản dựng của storyboard đang mở.
+- Nút tạo bản dựng mới.
+- Nút đổi tên và xoá bản dựng đang chọn.
+- Tiêu đề timeline của bản dựng đang chọn và số lượng clip.
+- Tổng thời lượng.
+- Danh sách clip gồm thứ tự, label, filename, time range và duration.
+- Nút lên/xuống để đổi thứ tự.
+- Nút xoá clip.
+- Nút `Đưa storyboard vào timeline`.
+- Nút `Xuất clip rời (.zip)`.
 
-Existing match cards should gain an action such as `Thêm vào timeline` in addition to preview and trim. Vietnamese copy should stay consistent with the current app.
+Các match card hiện tại nên có thêm action `Thêm vào timeline`, bên cạnh preview và trim. Copy UI tiếp tục dùng tiếng Việt nhất quán với app.
 
-State ownership should stay near existing storyboard state in `src/App.tsx` unless the implementation first extracts storyboard state into a focused hook. Avoid unrelated refactors.
+State của danh sách bản dựng và timeline clip nên đặt gần state storyboard hiện tại trong `src/App.tsx`, trừ khi quá trình triển khai cần tách trước một hook nhỏ dành riêng cho storyboard. Tránh refactor không liên quan.
 
-## Data Flow
+## Luồng Dữ Liệu
 
-1. User opens a saved storyboard.
-2. Frontend fetches `/api/storyboards/{id}/timeline`.
-3. User adds matches or imports all storyboard beats into timeline.
-4. Frontend updates local timeline state and persists with `PUT /api/storyboards/{id}/timeline`.
-5. User clicks export.
-6. Backend reads saved timeline clips, trims each clip, zips them, and returns the zip download.
+1. Người dùng mở một storyboard đã lưu.
+2. Frontend gọi `/api/storyboards/{id}/timelines` để load danh sách bản dựng và clip.
+3. Người dùng chọn một bản dựng hoặc tạo bản dựng mới.
+4. Người dùng thêm match hoặc đưa toàn bộ storyboard vào bản dựng timeline.
+5. Frontend cập nhật state local và persist clip bằng `PUT /api/storyboard-timelines/{timeline_id}/clips`.
+6. Người dùng bấm export.
+7. Backend đọc bản dựng timeline đã lưu, trim từng clip, zip các file MP4 và trả file ZIP để tải về.
 
-## Error Handling
+## Xử Lý Lỗi
 
-Show user-facing Vietnamese errors for:
+Hiển thị lỗi tiếng Việt cho các trường hợp:
 
-- Storyboard has not been saved yet.
-- Timeline is empty.
-- ffmpeg is unavailable.
-- A source video cannot be found.
-- Export fails during trimming or zipping.
+- Storyboard chưa được lưu.
+- Chưa có bản dựng timeline nào.
+- Bản dựng timeline rỗng.
+- Server không có ffmpeg.
+- Không tìm thấy video nguồn.
+- Export lỗi khi trim hoặc zip.
 
-During export, disable export controls and show a loading state. If export fails, keep the timeline unchanged.
+Trong lúc export, disable các control liên quan và hiển thị trạng thái loading. Nếu export lỗi, giữ nguyên timeline hiện tại.
 
-## Testing
+## Kiểm Thử
 
 Backend tests:
 
-- Timeline CRUD for a saved storyboard.
-- Timeline rows are isolated per storyboard.
-- Deleting storyboard removes its timeline clips.
-- Export rejects empty timelines.
-- Export validates invalid ranges.
+- CRUD bản dựng timeline cho một storyboard đã lưu.
+- Một storyboard có thể có nhiều bản dựng timeline.
+- Timeline của các storyboard khác nhau không lẫn nhau.
+- Xoá storyboard thì xoá bản dựng timeline và clip đi kèm.
+- Xoá bản dựng timeline thì xoá clip đi kèm.
+- Export từ chối bản dựng timeline rỗng.
+- Export validate khoảng thời gian không hợp lệ.
 
 Frontend tests:
 
-- Timeline panel renders for saved storyboard.
-- Unsaved storyboard shows save-required message.
-- `Đưa storyboard vào timeline` adds matches in beat order.
-- Reorder and remove actions update timeline order.
-- Export button is disabled for empty timeline and busy during export.
+- Panel bản dựng timeline render cho storyboard đã lưu.
+- Storyboard chưa lưu hiển thị thông báo cần lưu trước.
+- Tạo và chọn nhiều bản dựng cho cùng một storyboard.
+- `Đưa storyboard vào timeline` thêm match theo thứ tự beat.
+- Reorder và remove cập nhật đúng thứ tự timeline.
+- Nút export bị disable khi timeline rỗng và đang busy khi export.
 
 Manual verification:
 
-- Run `npm run lint` after frontend changes.
-- Run `npm run build` after frontend changes.
-- Run relevant backend pytest files if backend tests are added.
+- Sau khi sửa frontend, chạy `npm run lint`.
+- Sau khi sửa frontend, chạy `npm run build`.
+- Nếu thêm backend tests, chạy các file pytest liên quan.
 
-## Open Decisions
+## Quyết Định Đã Chốt
 
-No open product decisions remain for this version. The selected direction is many timelines, one per saved storyboard, exporting separate clips as a ZIP.
+Không còn quyết định sản phẩm mở cho phiên bản này. Hướng đã chọn là một storyboard đã lưu có thể có nhiều bản dựng timeline, mỗi bản dựng export thành nhiều clip rời trong một file ZIP.

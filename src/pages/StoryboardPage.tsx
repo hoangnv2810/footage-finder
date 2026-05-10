@@ -141,10 +141,13 @@ export function StoryboardPage({
   const activeFolderId = storyboardFolder?.id || null;
   const [expandedFolderId, setExpandedFolderId] = useState<number | null>(activeFolderId);
   const [folderMenuOpenId, setFolderMenuOpenId] = useState<number | null>(null);
+  const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(true);
   const folderMenuRef = useRef<HTMLDivElement | null>(null);
   const folderRows = storyboardFolders.length > 0
     ? storyboardFolders
     : [{ folder: storyboardFolder, sourceSummary: storyboardSourceSummary, storyboardCount: savedStoryboards.length }].filter((row): row is { folder: ProductFolderSummary; sourceSummary: { videoCount: number; sceneCount: number }; storyboardCount: number } => !!row.folder);
+  const canUseTimeline = !!selectedSavedStoryboardId;
+  const showCollapsedTimeline = canUseTimeline && isTimelineCollapsed;
 
   useEffect(() => {
     setExpandedFolderId(activeFolderId);
@@ -350,14 +353,16 @@ export function StoryboardPage({
             />
           </div>
 
-          <div className="h-[280px] w-full shrink-0 border-t border-border bg-card p-2 min-h-0 overflow-hidden xl:h-auto xl:w-[300px] xl:border-l xl:border-t-0 xl:p-3 2xl:w-[340px]">
+          <div data-testid="storyboard-timeline-slot" className={`${showCollapsedTimeline ? 'h-12 xl:h-auto xl:w-12 xl:p-2' : 'h-[280px] xl:h-auto xl:w-[300px] xl:p-3 2xl:w-[340px]'} w-full shrink-0 border-t border-border bg-card p-2 min-h-0 overflow-hidden xl:border-l xl:border-t-0`}>
             <StoryboardTimelinePanel
-              canUseTimeline={!!selectedSavedStoryboardId}
+              canUseTimeline={canUseTimeline}
               timelines={storyboardTimelines}
               selectedTimelineId={selectedStoryboardTimelineId}
+              isCollapsed={showCollapsedTimeline}
               isLoading={isLoadingStoryboardTimelines}
               isSaving={isMutatingStoryboardTimeline}
               isExporting={isExportingStoryboardTimeline}
+              onToggleCollapsed={() => setIsTimelineCollapsed((value) => !value)}
               onCreateTimeline={onCreateStoryboardTimeline}
               onSelectTimeline={onSelectStoryboardTimeline}
               onRenameTimeline={onRenameStoryboardTimeline}

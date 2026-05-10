@@ -85,6 +85,23 @@ describe('StoryboardPreviewPanel', () => {
     expect(screen.getByText('1')).toHaveClass('shrink-0');
   });
 
+  it('lays out preview video and footage matches side by side on wide screens', () => {
+    render(
+      <StoryboardPreviewPanel
+        beat={beat}
+        previewMatch={match}
+        trimmingSceneId={null}
+        onPreviewMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
+        onPlayerRef={vi.fn()}
+        onTimeUpdate={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('storyboard-preview-match-layout')).toHaveClass('xl:grid-cols-[minmax(260px,42%)_minmax(320px,58%)]');
+  });
+
   it('loads the preview video without a media-fragment seek so JS owns positioning', () => {
     // The browser auto-seek triggered by a `#t=start,end` fragment used to race
     // our explicit JS seek and let the player play from second 0 on Chromium.
@@ -369,6 +386,28 @@ describe('StoryboardPreviewPanel', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Xem' }));
+
+    expect(onPreviewMatch).toHaveBeenCalledTimes(1);
+    expect(onPreviewMatch).toHaveBeenCalledWith(match);
+  });
+
+  it('plays the matching scene when clicking the footage match item body', () => {
+    const onPreviewMatch = vi.fn();
+
+    render(
+      <StoryboardPreviewPanel
+        beat={beat}
+        previewMatch={null}
+        trimmingSceneId={null}
+        onPreviewMatch={onPreviewMatch}
+        onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
+        onPlayerRef={vi.fn()}
+        onTimeUpdate={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Khớp với cảnh quay sản phẩm'));
 
     expect(onPreviewMatch).toHaveBeenCalledTimes(1);
     expect(onPreviewMatch).toHaveBeenCalledWith(match);

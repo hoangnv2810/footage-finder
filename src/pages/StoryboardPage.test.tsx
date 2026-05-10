@@ -119,6 +119,7 @@ describe('StoryboardPage', () => {
     expect(screen.getByText(/Tạo tự động/)).toBeInTheDocument();
     expect(screen.getByText(/Import JSON/)).toBeInTheDocument();
     expect(screen.queryByText('Đã copy input vào clipboard.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('storyboard-timeline-slot')).not.toHaveClass('h-12');
   });
 
   it('selects another folder from the collapsible folder list', () => {
