@@ -133,7 +133,7 @@ describe('StoryboardTimelinePanel', () => {
       onRemoveClip,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tạo bản dựng mới' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo bản dựng' }));
     fireEvent.click(screen.getByRole('button', { name: 'Đưa storyboard vào timeline' }));
     fireEvent.click(screen.getByRole('button', { name: 'Đưa Hook xuống' }));
     fireEvent.click(screen.getByRole('button', { name: 'Xoá Hook khỏi timeline' }));

@@ -332,11 +332,13 @@ export function StoryboardPage({
           <div className="px-3 py-2.5 border-b border-border shrink-0">
             <h3 className="text-xs font-semibold text-secondary-foreground">Danh sách beat</h3>
           </div>
-          <StoryboardBeatList
-            beats={beatViews}
-            selectedBeatId={selectedStoryboardBeatId}
-            onSelectBeat={(beat) => onSelectBeat(beat.id)}
-          />
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar">
+            <StoryboardBeatList
+              beats={beatViews}
+              selectedBeatId={selectedStoryboardBeatId}
+              onSelectBeat={(beat) => onSelectBeat(beat.id)}
+            />
+          </div>
         </div>
 
         <div className="flex-1 flex flex-col xl:flex-row min-w-0 min-h-0 bg-background overflow-hidden">
@@ -353,7 +355,7 @@ export function StoryboardPage({
             />
           </div>
 
-          <div data-testid="storyboard-timeline-slot" className={`${showCollapsedTimeline ? 'h-12 xl:h-auto xl:w-12 xl:p-2' : 'h-[280px] xl:h-auto xl:w-[300px] xl:p-3 2xl:w-[340px]'} w-full shrink-0 border-t border-border bg-card p-2 min-h-0 overflow-hidden xl:border-l xl:border-t-0`}>
+          <div data-testid="storyboard-timeline-slot" className={`${showCollapsedTimeline ? 'h-12 xl:h-auto xl:w-12 xl:p-2 p-2' : 'h-[280px] xl:h-auto xl:w-[300px] xl:p-0 2xl:w-[340px] p-0'} w-full shrink-0 border-t border-border bg-card min-h-0 overflow-hidden xl:border-l xl:border-t-0`}>
             <StoryboardTimelinePanel
               canUseTimeline={canUseTimeline}
               timelines={storyboardTimelines}
