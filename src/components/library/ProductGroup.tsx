@@ -93,7 +93,7 @@ export function ProductGroup({
             <button
               type="button"
               onClick={() => setMenuOpen((prev) => !prev)}
-              className="rounded-lg border border-transparent p-1.5 text-muted-foreground transition-colors hover:border-border/70 hover:bg-background hover:text-foreground"
+              className="cursor-pointer rounded-lg border border-transparent p-1.5 text-muted-foreground"
               aria-label={`Mở menu thư mục ${product.name}`}
               aria-haspopup="menu"
               aria-expanded={menuOpen}

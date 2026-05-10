@@ -93,7 +93,10 @@ describe('ProductVideoList', () => {
       expect(headerBar).toContainElement(screen.getByRole('button', { name: 'Tạo thư mục' }));
     }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mở menu thư mục Folder A' }));
+    const folderMenuButton = screen.getByRole('button', { name: 'Mở menu thư mục Folder A' });
+    expect(folderMenuButton).toHaveClass('cursor-pointer');
+    expect(folderMenuButton).not.toHaveClass('hover:bg-background', 'hover:border-border/70', 'hover:text-foreground');
+    fireEvent.click(folderMenuButton);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Sửa tên' }));
     expect(onRenameFolder).toHaveBeenCalledWith(products[0]);
 

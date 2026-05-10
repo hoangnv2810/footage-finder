@@ -556,7 +556,10 @@ describe('StoryboardPage', () => {
 
     expect(screen.queryByRole('button', { name: 'Sửa folder' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mở menu thư mục Loa' }));
+    const folderMenuButton = screen.getByRole('button', { name: 'Mở menu thư mục Loa' });
+    expect(folderMenuButton).toHaveClass('cursor-pointer');
+    expect(folderMenuButton).not.toHaveClass('hover:bg-background', 'hover:border-border/70', 'hover:text-foreground');
+    fireEvent.click(folderMenuButton);
     expect(screen.getByRole('menu')).toHaveClass('min-w-[7rem]', 'p-0.5');
     expect(screen.getByRole('menuitem', { name: /Sửa/ })).toHaveClass('py-1.5', 'text-xs');
     fireEvent.click(screen.getByRole('menuitem', { name: /Sửa/ }));

@@ -198,7 +198,7 @@ export function StoryboardTimelinePanel({
                           type="button"
                           disabled={isBusy}
                           aria-label={`Mở menu bản dựng ${timeline.name}`}
-                          className="shrink-0 rounded-lg border border-transparent p-1.5 text-muted-foreground transition-colors hover:border-border/70 hover:bg-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          className="shrink-0 cursor-pointer rounded-lg border border-transparent p-1.5 text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>

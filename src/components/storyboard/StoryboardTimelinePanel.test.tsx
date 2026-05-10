@@ -204,6 +204,8 @@ describe('StoryboardTimelinePanel', () => {
     renderPanel();
 
     const menuButton = screen.getByRole('button', { name: 'Mở menu bản dựng Bản dựng chính' });
+    expect(menuButton).toHaveClass('cursor-pointer');
+    expect(menuButton).not.toHaveClass('hover:bg-background', 'hover:border-border/70', 'hover:text-foreground');
     menuButton.focus();
     fireEvent.keyDown(menuButton, { key: 'Enter' });
 

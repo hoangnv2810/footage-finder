@@ -210,7 +210,7 @@ export function StoryboardPage({
                         <button
                           type="button"
                           onClick={() => setFolderMenuOpenId((prev) => (prev === row.folder.id ? null : row.folder.id))}
-                          className="rounded-lg border border-transparent p-1.5 text-muted-foreground transition-colors hover:border-border/70 hover:bg-background hover:text-foreground"
+                          className="cursor-pointer rounded-lg border border-transparent p-1.5 text-muted-foreground"
                           aria-label={`Mở menu thư mục ${row.folder.name}`}
                           aria-haspopup="menu"
                           aria-expanded={folderMenuOpenId === row.folder.id}
