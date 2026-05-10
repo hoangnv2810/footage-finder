@@ -21,8 +21,35 @@ const mockSavedStoryboard = vi.hoisted(() => ({
   beatCount: 0,
   folder: null,
   result: {
-    beats: [],
-    beatMatches: [],
+      beats: [
+        {
+          id: 'beat-1',
+          label: 'Hook',
+          text: 'Hook text',
+          intent: 'Hook intent',
+          desiredVisuals: 'Demo',
+          durationHint: 3,
+          position: 0,
+        },
+      ],
+      beatMatches: [
+        {
+          beatId: 'beat-1',
+          matches: [
+            {
+              id: 'match-1',
+              beatId: 'beat-1',
+              videoVersionId: 'version-1',
+              fileName: 'hook.mp4',
+              sceneIndex: 0,
+              score: 95,
+              matchReason: 'Best match',
+              usageType: 'direct_product' as const,
+              scene: { keyword: 'hook', start: 1, end: 4, description: 'Hook scene' },
+            },
+          ],
+        },
+      ],
     models: {
       video_analysis_model: 'test',
       script_planning_model: 'test',
@@ -47,6 +74,7 @@ vi.mock('@/pages/StoryboardPage', () => ({
         <button type="button" onClick={() => props.onSelectSavedStoryboard('storyboard-1')}>Open saved storyboard</button>
         <button type="button" onClick={() => props.onSelectSavedStoryboard('storyboard-2')}>Open second storyboard</button>
         <button type="button" onClick={() => props.onCreateStoryboardTimeline()}>Create timeline</button>
+        <button type="button" onClick={() => props.onCreateStoryboardTimeline('Bản dựng UGC', true)}>Quick create named timeline</button>
         <button
           type="button"
           onClick={() => props.onAddMatchToTimeline({
@@ -166,6 +194,53 @@ describe('App storyboard timelines', () => {
 
     await waitFor(() => expect(storyboardPageProps?.isLoadingStoryboardTimelines).toBe(false));
     expect(screen.getByTestId('selected-timeline')).toHaveTextContent('timeline-1');
+  });
+
+  it('creates a named timeline and quick-populates it from storyboard matches', async () => {
+    vi.mocked(replaceStoryboardTimelineClips).mockResolvedValue({
+      id: 'timeline-created',
+      storyboardId: 'storyboard-1',
+      name: 'Bản dựng UGC',
+      position: 1,
+      createdAt: 3,
+      updatedAt: 4,
+      clips: [
+        {
+          id: 'clip-created',
+          timelineId: 'timeline-created',
+          beatId: 'beat-1',
+          label: 'Hook',
+          filename: 'hook.mp4',
+          start: 1,
+          end: 4,
+          sceneIndex: 0,
+          position: 0,
+          createdAt: 4,
+          updatedAt: 4,
+        },
+      ],
+    });
+
+    render(<App />);
+
+    await screen.findByRole('button', { name: 'Open saved storyboard' });
+    fireEvent.click(screen.getByRole('button', { name: 'Open saved storyboard' }));
+    await waitFor(() => expect(screen.getByTestId('selected-timeline')).toHaveTextContent('timeline-1'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quick create named timeline' }));
+
+    await waitFor(() => expect(createStoryboardTimeline).toHaveBeenCalledWith('storyboard-1', 'Bản dựng UGC'));
+    await waitFor(() => expect(replaceStoryboardTimelineClips).toHaveBeenCalledWith('timeline-created', [
+      {
+        beatId: 'beat-1',
+        label: 'Hook',
+        filename: 'hook.mp4',
+        start: 1,
+        end: 4,
+        sceneIndex: 0,
+      },
+    ]));
+    await waitFor(() => expect(screen.getByTestId('selected-timeline')).toHaveTextContent('timeline-created'));
   });
 
   it('ignores add-match calls while timelines for a newly selected storyboard are loading', async () => {

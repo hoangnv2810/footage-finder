@@ -57,7 +57,7 @@ interface StoryboardPageProps {
   onSelectBeat: (beatId: string) => void;
   onPlayStoryboardMatch: (match: StoryboardMatch) => void;
   onTrimMatch: (match: StoryboardMatch) => void;
-  onCreateStoryboardTimeline: () => void;
+  onCreateStoryboardTimeline: (name?: string, quickCreate?: boolean) => void;
   onSelectStoryboardTimeline: (timelineId: string) => void;
   onRenameStoryboardTimeline: (timelineId: string, name: string) => void;
   onDeleteStoryboardTimeline: (timelineId: string) => void;

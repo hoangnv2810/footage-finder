@@ -959,21 +959,55 @@ function WorkspaceApp() {
     storyboardTimelines.find((timeline) => timeline.id === selectedStoryboardTimelineId) || null
   ), [selectedStoryboardTimelineId, storyboardTimelines]);
 
-  const createTimelineForSelectedStoryboard = useCallback(async () => {
+  const buildStoryboardTimelineInputs = useCallback((timeline: StoryboardTimeline) => {
+    if (!storyboardResult) return timeline.clips.map(timelineClipToInput);
+
+    const nextInputs = [...timeline.clips.map(timelineClipToInput)];
+    storyboardResult.beats.forEach((beat, index) => {
+      const firstMatch = storyboardResult.beatMatches.find((group) => group.beatId === beat.id)?.matches[0] || null;
+      const match = storyboardPreviewMatch?.beatId === beat.id ? storyboardPreviewMatch : firstMatch;
+      if (!match) return;
+
+      const input = matchToTimelineClipInput(match, beat.label || `Beat ${index + 1}`);
+      if (!nextInputs.some((clip) => isSameTimelineClip(clip, input))) {
+        nextInputs.push(input);
+      }
+    });
+
+    return nextInputs;
+  }, [storyboardPreviewMatch, storyboardResult]);
+
+  const createTimelineForSelectedStoryboard = useCallback(async (name?: string, quickCreate = false) => {
     if (!selectedSavedStoryboardId) {
       toast.error('Vui lòng lưu hoặc chọn storyboard trước khi tạo timeline.');
       return;
     }
 
     try {
-      const timeline = await runStoryboardTimelineMutation(() => createStoryboardTimeline(selectedSavedStoryboardId));
+      const timeline = await runStoryboardTimelineMutation(() => createStoryboardTimeline(selectedSavedStoryboardId, name));
       if (!timeline) return;
-      setStoryboardTimelines((prev) => [...prev, timeline].sort((a, b) => a.position - b.position));
+
+      setStoryboardTimelines((prev) => [...prev.filter((item) => item.id !== timeline.id), timeline].sort((a, b) => a.position - b.position));
       setSelectedStoryboardTimelineId(timeline.id);
+
+      if (quickCreate) {
+        const quickClips = buildStoryboardTimelineInputs(timeline);
+        if (quickClips.length > timeline.clips.length) {
+          try {
+            const populatedTimeline = await runStoryboardTimelineMutation(() => replaceStoryboardTimelineClips(timeline.id, quickClips));
+            if (populatedTimeline) {
+              setStoryboardTimelines((prev) => prev.map((item) => (item.id === populatedTimeline.id ? populatedTimeline : item)));
+              setSelectedStoryboardTimelineId(populatedTimeline.id);
+            }
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Đã tạo bản dựng nhưng không thể tạo nhanh.');
+          }
+        }
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể tạo timeline storyboard.');
     }
-  }, [runStoryboardTimelineMutation, selectedSavedStoryboardId]);
+  }, [buildStoryboardTimelineInputs, runStoryboardTimelineMutation, selectedSavedStoryboardId]);
 
   const renameStoryboardTimeline = useCallback(async (timelineId: string, name: string) => {
     const nextName = name.trim();
@@ -1046,18 +1080,7 @@ function WorkspaceApp() {
     }
 
     const existingInputs = timeline.clips.map(timelineClipToInput);
-    const nextInputs = [...existingInputs];
-
-    storyboardResult.beats.forEach((beat, index) => {
-      const firstMatch = storyboardResult.beatMatches.find((group) => group.beatId === beat.id)?.matches[0] || null;
-      const match = storyboardPreviewMatch?.beatId === beat.id ? storyboardPreviewMatch : firstMatch;
-      if (!match) return;
-
-      const input = matchToTimelineClipInput(match, beat.label || `Beat ${index + 1}`);
-      if (!nextInputs.some((clip) => isSameTimelineClip(clip, input))) {
-        nextInputs.push(input);
-      }
-    });
+    const nextInputs = buildStoryboardTimelineInputs(timeline);
 
     if (nextInputs.length === existingInputs.length) return;
 
@@ -1066,7 +1089,7 @@ function WorkspaceApp() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể đưa storyboard vào timeline.');
     }
-  }, [getSelectedStoryboardTimeline, persistTimelineClips, selectedSavedStoryboardId, storyboardPreviewMatch, storyboardResult]);
+  }, [buildStoryboardTimelineInputs, getSelectedStoryboardTimeline, persistTimelineClips, selectedSavedStoryboardId, storyboardResult]);
 
   const moveTimelineClip = useCallback(async (clipId: string, direction: 'up' | 'down') => {
     const timeline = getSelectedStoryboardTimeline();
@@ -1609,7 +1632,7 @@ function WorkspaceApp() {
               onSelectBeat={setSelectedStoryboardBeatId}
               onPlayStoryboardMatch={playStoryboardMatch}
               onTrimMatch={(match) => void trimAndDownload({ fileName: match.fileName }, match.scene, match.sceneIndex)}
-              onCreateStoryboardTimeline={() => void createTimelineForSelectedStoryboard()}
+              onCreateStoryboardTimeline={(name, quickCreate) => void createTimelineForSelectedStoryboard(name, quickCreate)}
               onSelectStoryboardTimeline={setSelectedStoryboardTimelineId}
               onRenameStoryboardTimeline={(timelineId, name) => void renameStoryboardTimeline(timelineId, name)}
               onDeleteStoryboardTimeline={(timelineId) => void removeStoryboardTimeline(timelineId)}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { StoryboardTimeline } from '@/lib/footage-app';
@@ -73,11 +73,30 @@ describe('StoryboardTimelinePanel', () => {
   it('renders selected timeline clips and total duration', () => {
     renderPanel();
 
-    expect(screen.getByText('Bản dựng chính')).toBeInTheDocument();
-    expect(screen.getByText('1 clip · 0:03')).toBeInTheDocument();
+    expect(screen.getAllByText('Bản dựng chính').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('1 clip · 0:03').length).toBeGreaterThan(0);
     expect(screen.getByText('Hook')).toBeInTheDocument();
     expect(screen.getByText('hook-demo.mp4')).toBeInTheDocument();
     expect(screen.getByText('0:01 - 0:04')).toBeInTheDocument();
+  });
+
+  it('creates a named timeline from the modal and can request quick creation', () => {
+    const onCreateTimeline = vi.fn();
+    renderPanel({ onCreateTimeline });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo bản dựng' }));
+
+    expect(screen.getByRole('dialog')).toHaveClass('rounded-md', 'border-border', 'bg-card', 'p-0');
+    expect(screen.getByRole('heading', { name: 'Tạo bản dựng' })).toHaveClass('text-base', 'font-semibold');
+    expect(screen.queryByText('Đặt tên bản dựng mới trước khi đưa clip vào timeline.')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Tên bản dựng'), { target: { value: 'Bản dựng UGC' } });
+    const quickCreateCheckbox = screen.getByLabelText('Tạo nhanh từ storyboard');
+    expect(quickCreateCheckbox).toHaveClass('accent-primary', 'bg-background');
+    fireEvent.click(quickCreateCheckbox);
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo' }));
+
+    expect(onCreateTimeline).toHaveBeenCalledWith('Bản dựng UGC', true);
   });
 
   it("calls export with the selected non-empty timeline", () => {
@@ -93,7 +112,7 @@ describe('StoryboardTimelinePanel', () => {
     const onExport = vi.fn();
     renderPanel({ selectedTimelineId: null, onExport });
 
-    expect(screen.getByText('1 clip · 0:03')).toBeInTheDocument();
+    expect(screen.getAllByText('1 clip · 0:03').length).toBeGreaterThan(0);
     expect(screen.getByText('Hook')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Xuất clip rời (.zip)' }));
@@ -134,7 +153,7 @@ describe('StoryboardTimelinePanel', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Tạo bản dựng' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Đưa storyboard vào timeline' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo nhanh' }));
     fireEvent.click(screen.getByRole('button', { name: 'Đưa Hook xuống' }));
     fireEvent.click(screen.getByRole('button', { name: 'Xoá Hook khỏi timeline' }));
 
@@ -142,6 +161,125 @@ describe('StoryboardTimelinePanel', () => {
     expect(onAddStoryboard).not.toHaveBeenCalled();
     expect(onMoveClip).not.toHaveBeenCalled();
     expect(onRemoveClip).not.toHaveBeenCalled();
+  });
+
+  it('renames bulk actions for the vertical build flow', () => {
+    const onAddStoryboard = vi.fn();
+    const onClearClips = vi.fn();
+    renderPanel({ onAddStoryboard, onClearClips });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo nhanh' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Làm mới' }));
+
+    expect(screen.queryByRole('button', { name: 'Đưa storyboard vào timeline' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Xoá hết' })).not.toBeInTheDocument();
+    expect(onAddStoryboard).toHaveBeenCalledTimes(1);
+    expect(onClearClips).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows selected timeline actions on the same row without helper text', () => {
+    renderPanel();
+
+    const selectedRow = screen.getByTestId('selected-timeline-actions-row');
+
+    expect(selectedRow).toHaveTextContent('Bản dựng chính');
+    expect(selectedRow).toContainElement(screen.getByRole('button', { name: 'Tạo nhanh' }));
+    expect(selectedRow).toContainElement(screen.getByRole('button', { name: 'Làm mới' }));
+    expect(screen.queryByText('Timeline đang chọn')).not.toBeInTheDocument();
+  });
+
+  it('highlights the selected build version row', () => {
+    renderPanel();
+
+    const selectedBuild = screen.getByTestId('timeline-row-timeline-1');
+
+    expect(selectedBuild).toHaveClass('bg-primary/15', 'border-l-primary', 'ring-primary/20');
+  });
+
+  it('uses concise edit label in the timeline action menu', () => {
+    renderPanel();
+
+    const menuButton = screen.getByRole('button', { name: 'Mở menu bản dựng Bản dựng chính' });
+    menuButton.focus();
+    fireEvent.keyDown(menuButton, { key: 'Enter' });
+
+    const menu = screen.getByRole('menu');
+    const editItem = screen.getByRole('menuitem', { name: 'Sửa' });
+    const deleteItem = screen.getByRole('menuitem', { name: 'Xóa' });
+
+    expect(menu).toHaveClass('min-w-[7rem]', 'p-0.5');
+    expect(editItem).toHaveClass('gap-1.5', 'rounded', 'px-2', 'py-1.5', 'text-xs');
+    expect(deleteItem).toHaveClass('gap-1.5', 'rounded', 'px-2', 'py-1.5', 'text-xs', 'hover:bg-destructive/10');
+    expect(editItem.querySelector('svg')).toHaveClass('h-3.5', 'w-3.5');
+    expect(screen.queryByRole('menuitem', { name: 'Sửa tên' })).not.toBeInTheDocument();
+  });
+
+  it('rename dialog matches create dialog format', () => {
+    const onRenameTimeline = vi.fn();
+    renderPanel({ onRenameTimeline });
+
+    // Open rename dialog via test trigger (Radix DropdownMenu portal doesn't work in jsdom)
+    fireEvent.click(screen.getByTestId('rename-trigger-timeline-1'));
+
+    const dialog = screen.getByRole('dialog');
+
+    // Same container classes as create dialog
+    expect(dialog).toHaveClass('overflow-hidden', 'rounded-md', 'border-border', 'bg-card', 'p-0');
+
+    // Title matches create dialog style
+    expect(screen.getByRole('heading', { name: 'Sửa tên bản dựng' })).toHaveClass('text-base', 'font-semibold');
+    expect(dialog.querySelector('[data-slot="timeline-dialog-header"]')).toHaveClass('border-b', 'border-border', 'px-4', 'py-2');
+    expect(dialog.querySelector('[data-slot="timeline-dialog-body"]')).toHaveClass('px-4', 'py-2');
+    expect(dialog.querySelector('[data-slot="timeline-dialog-footer"]')).toHaveClass('px-4', 'pb-2', 'pt-1');
+
+    // No description text
+    expect(screen.queryByText('Đổi tên để phân biệt các version dựng khác nhau.')).not.toBeInTheDocument();
+
+    // Submit rename
+    fireEvent.change(screen.getByLabelText('Tên bản dựng'), { target: { value: 'Tên mới' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu' }));
+
+    expect(onRenameTimeline).toHaveBeenCalledWith('timeline-1', 'Tên mới');
+  });
+
+  it('shows a confirmation popup before deleting a timeline', () => {
+    const onDeleteTimeline = vi.fn();
+    renderPanel({ onDeleteTimeline });
+
+    // Open delete confirmation via test trigger
+    fireEvent.click(screen.getByTestId('delete-trigger-timeline-1'));
+
+    // Confirmation dialog should appear
+    const dialog = screen.getByRole('dialog');
+
+    expect(dialog).toHaveClass('overflow-hidden', 'rounded-md', 'border-border', 'bg-card', 'p-0');
+    expect(screen.getByRole('heading', { name: 'Xóa bản dựng' })).toHaveClass('text-base', 'font-semibold');
+    expect(dialog.querySelector('[data-slot="timeline-dialog-header"]')).toHaveClass('border-b', 'border-border', 'px-4', 'py-2');
+    expect(dialog.querySelector('[data-slot="timeline-dialog-body"]')).toHaveClass('space-y-2', 'px-4', 'py-2', 'text-sm');
+    expect(screen.getByText(/Tất cả clip trong bản dựng này/)).toBeInTheDocument();
+    const { getByText } = within(dialog);
+    expect(getByText(/Bản dựng chính/)).toBeInTheDocument();
+
+    // Not deleted yet
+    expect(onDeleteTimeline).not.toHaveBeenCalled();
+
+    // Confirm deletion
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa' }));
+
+    expect(onDeleteTimeline).toHaveBeenCalledWith('timeline-1');
+  });
+
+  it('does not delete when cancelling the confirmation popup', () => {
+    const onDeleteTimeline = vi.fn();
+    renderPanel({ onDeleteTimeline });
+
+    // Open delete confirmation via test trigger
+    fireEvent.click(screen.getByTestId('delete-trigger-timeline-1'));
+
+    // Cancel via Hủy button
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
+
+    expect(onDeleteTimeline).not.toHaveBeenCalled();
   });
 
   it('renders a compact vertical rail when collapsed', () => {
