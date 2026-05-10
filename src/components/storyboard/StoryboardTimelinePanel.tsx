@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronUp, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, ChevronUp, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -133,11 +133,13 @@ export function StoryboardTimelinePanel({
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-md bg-card/50">
       <div className="border-b border-border px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
+          <div data-testid="timeline-panel-header" className="min-w-0">
             <h4 className="text-[13px] font-semibold text-white">Timeline bản dựng</h4>
-            <p className="text-xs text-muted-foreground">
-              {isLoading ? 'Đang tải bản dựng...' : isSaving ? 'Đang lưu bản dựng...' : selectedTimeline ? `${clipCount} clip · ${formatDuration(totalDuration)}` : 'Chưa có bản dựng'}
-            </p>
+            {isLoading || isSaving || !selectedTimeline ? (
+              <p className="text-xs text-muted-foreground">
+                {isLoading ? 'Đang tải bản dựng...' : isSaving ? 'Đang lưu bản dựng...' : 'Chưa có bản dựng'}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
@@ -170,7 +172,11 @@ export function StoryboardTimelinePanel({
             className="flex w-full items-center justify-between gap-2 border-b border-border/60 px-3 py-2 text-left transition-colors hover:bg-surface-hover"
           >
             <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-secondary-foreground">
-              {isTimelineListExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />}
+              {isTimelineListExpanded ? (
+                <ChevronDown data-testid="timeline-list-expanded-icon" className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <ChevronRight data-testid="timeline-list-collapsed-icon" className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
               Danh sách bản dựng
             </span>
             <span className="text-[11px] text-muted-foreground">{timelines.length} bản</span>

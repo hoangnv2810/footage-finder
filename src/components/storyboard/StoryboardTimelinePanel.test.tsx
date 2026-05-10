@@ -75,6 +75,8 @@ describe('StoryboardTimelinePanel', () => {
 
     expect(screen.getAllByText('Bản dựng chính').length).toBeGreaterThan(0);
     expect(screen.getAllByText('1 clip · 0:03').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('timeline-panel-header')).not.toHaveTextContent('1 clip · 0:03');
+    expect(screen.getByTestId('timeline-row-timeline-1')).toHaveTextContent('1 clip · 0:03');
     expect(screen.getByText('Hook')).toBeInTheDocument();
     expect(screen.queryByText('hook-demo.mp4')).not.toBeInTheDocument();
     expect(screen.getByText('0:01 - 0:04')).toBeInTheDocument();
@@ -225,6 +227,15 @@ describe('StoryboardTimelinePanel', () => {
     const selectedBuild = screen.getByTestId('timeline-row-timeline-1');
 
     expect(selectedBuild).toHaveClass('bg-primary/15', 'border-l-primary', 'ring-primary/20');
+  });
+
+  it('uses right-facing chevron when the build list is collapsed', () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: /Danh sách bản dựng/ }));
+
+    expect(screen.getByTestId('timeline-list-collapsed-icon')).toBeInTheDocument();
+    expect(screen.queryByTestId('timeline-list-up-icon')).not.toBeInTheDocument();
   });
 
   it('uses concise edit label in the timeline action menu', () => {
