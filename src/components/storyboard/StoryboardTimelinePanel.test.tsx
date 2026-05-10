@@ -177,12 +177,16 @@ describe('StoryboardTimelinePanel', () => {
     expect(onClearClips).toHaveBeenCalledTimes(1);
   });
 
-  it('shows selected timeline actions on the same row without helper text', () => {
+  it('shows selected timeline actions as a compact toolbar without duplicating the selected row', () => {
     renderPanel();
 
     const selectedRow = screen.getByTestId('selected-timeline-actions-row');
+    const actionLabel = screen.getByText('Thao tác');
 
-    expect(selectedRow).toHaveTextContent('Bản dựng chính');
+    expect(selectedRow).toHaveTextContent('Thao tác');
+    expect(selectedRow).not.toHaveTextContent('Bản dựng chính');
+    expect(selectedRow).not.toHaveTextContent('1 clip · 0:03');
+    expect(actionLabel).not.toHaveClass('uppercase', 'tracking-[0.16em]');
     expect(selectedRow).toContainElement(screen.getByRole('button', { name: 'Tạo nhanh' }));
     expect(selectedRow).toContainElement(screen.getByRole('button', { name: 'Làm mới' }));
     expect(screen.queryByText('Timeline đang chọn')).not.toBeInTheDocument();
