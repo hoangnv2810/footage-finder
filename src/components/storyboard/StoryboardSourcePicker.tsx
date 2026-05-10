@@ -26,10 +26,10 @@ export function StoryboardSourcePicker({ sources, selected, onToggle, hideHeader
     return map;
   }, [sources]);
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggleGroup = (name: string) => {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
@@ -50,7 +50,7 @@ export function StoryboardSourcePicker({ sources, selected, onToggle, hideHeader
 
       <div className={cn(disableInternalScroll ? '' : 'custom-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain')}>
         {Array.from(grouped.entries()).map(([productName, versions]) => {
-          const isCollapsed = collapsed.has(productName);
+          const isExpanded = expanded.has(productName);
           const selectedInGroup = versions.filter((version) => selected.has(version.id)).length;
           return (
             <div key={productName}>
@@ -59,7 +59,7 @@ export function StoryboardSourcePicker({ sources, selected, onToggle, hideHeader
                 className="w-full min-h-11 flex items-center gap-1 px-3 py-2 border-b border-border/50 text-sm hover:bg-surface-hover transition-colors"
               >
                 <span className="flex min-w-0 flex-1 items-center gap-2">
-                  {isCollapsed ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                  {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
                   <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <span className="truncate font-medium text-secondary-foreground">{productName}</span>
                 </span>
@@ -68,7 +68,7 @@ export function StoryboardSourcePicker({ sources, selected, onToggle, hideHeader
                   {versions.length}
                 </span>
               </button>
-              {!isCollapsed
+              {isExpanded
                 ? versions.map((version) => (
                     <button
                       key={version.id}
