@@ -39,7 +39,7 @@ export function ProductVideoList({
   onDeleteFolder,
 }: ProductVideoListProps) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       <div className="px-3 py-2 border-b border-border shrink-0">
         <div className="flex items-center justify-between gap-2">
           <div className="flex gap-1">

@@ -116,13 +116,10 @@ export function StoryboardTimelinePanel({
           type="button"
           onClick={onToggleCollapsed}
           aria-label="Mở timeline bản dựng"
-          className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-between gap-3 px-2 py-3 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
+          className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-between gap-3 px-2 py-3 text-muted-foreground transition-colors duration-200 ease-out hover:bg-surface-hover hover:text-foreground"
         >
-          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] [writing-mode:vertical-rl]">
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] [writing-mode:vertical-rl] drop-shadow-sm">
             Timeline
-          </span>
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
-            {clipCount}
           </span>
         </button>
       </section>
@@ -179,7 +176,7 @@ export function StoryboardTimelinePanel({
               )}
               Danh sách bản dựng
             </span>
-            <span className="text-[11px] text-muted-foreground">{timelines.length} bản</span>
+            <span className="text-[11px] font-medium text-secondary-foreground">{timelines.length} bản</span>
           </button>
           {isTimelineListExpanded ? (
             <div className="max-h-36 overflow-y-auto custom-scrollbar">
@@ -202,8 +199,8 @@ export function StoryboardTimelinePanel({
                       disabled={isBusy}
                       className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
                     >
-                      <span className={cn('block truncate text-xs font-semibold', isSelected ? 'text-primary' : 'text-foreground')}>{timeline.name}</span>
-                      <span className="block text-[11px] text-muted-foreground">{timeline.clips.length} clip · {formatDuration(timelineDuration)}</span>
+                      <span className={cn('block truncate text-[13px] font-semibold', isSelected ? 'text-primary' : 'text-foreground')}>{timeline.name}</span>
+                      <span className="mt-0.5 block text-[11px] font-medium text-secondary-foreground">{timeline.clips.length} clip · {formatDuration(timelineDuration)}</span>
                     </button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -270,7 +267,11 @@ export function StoryboardTimelinePanel({
               const clipDuration = clipEnd - clipStart;
 
               return (
-                <li key={clip.id} data-testid={`timeline-clip-item-${clip.id}`} className="rounded-md border border-border/60 bg-background/25 px-2.5 py-2 transition-colors">
+                <li
+                  key={clip.id}
+                  data-testid={`timeline-clip-item-${clip.id}`}
+                  className="cursor-pointer rounded-md border border-border/60 bg-background/25 px-2.5 py-2 transition-all duration-200 ease-out hover:border-primary/30 hover:bg-surface-hover/70 hover:shadow-sm hover:-translate-y-px"
+                >
                   <div data-testid={`timeline-clip-title-row-${clip.id}`} className="flex items-center justify-between gap-2.5">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       <span data-testid={`timeline-clip-index-${clip.id}`} className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-primary/30 bg-primary/10 text-[11px] font-bold text-primary">
@@ -312,7 +313,7 @@ export function StoryboardTimelinePanel({
                       </button>
                     </div>
                   </div>
-                  <p data-testid={`timeline-clip-time-${clip.id}`} className="mt-1.5 inline-flex rounded bg-secondary/50 px-1.5 py-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                  <p data-testid={`timeline-clip-time-${clip.id}`} className="mt-1.5 inline-flex rounded bg-secondary/50 px-1.5 py-0.5 text-[11px] font-medium leading-relaxed text-secondary-foreground">
                     <span>{formatDuration(clipStart)} - {formatDuration(clipEnd)}</span>
                     <span> · {formatDuration(clipDuration)}</span>
                   </p>
