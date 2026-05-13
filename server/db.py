@@ -1142,6 +1142,7 @@ def _storyboard_row_to_dict(row: sqlite3.Row, include_result: bool) -> dict:
         "source": row["source"],
         "folder": _load_storyboard_folder(row["folder_id"] if "folder_id" in row.keys() else None),
         "beatCount": len(result.get("beats", [])),
+        "importedModel": (result.get("models") or {}).get("imported_model", ""),
     }
     if include_result:
         payload["result"] = result
@@ -1424,6 +1425,22 @@ def replace_storyboard_timeline_clips(
     )
     conn.commit()
     return get_storyboard_timeline(timeline_id)
+
+
+def rename_storyboard_project(storyboard_id: str, new_name: str) -> dict | None:
+    conn = _get_conn()
+    now = int(time.time() * 1000)
+    conn.execute(
+        "UPDATE storyboard_project SET product_name = ?, updated_at = ? WHERE id = ?",
+        (new_name, now, storyboard_id),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM storyboard_project WHERE id = ?", (storyboard_id,)
+    ).fetchone()
+    if not row:
+        return None
+    return _storyboard_row_to_dict(row, include_result=False)
 
 
 def delete_storyboard_project(storyboard_id: str) -> bool:

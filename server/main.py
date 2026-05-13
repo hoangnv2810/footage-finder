@@ -47,6 +47,7 @@ from db import (
     list_storyboard_projects,
     list_storyboard_timelines,
     rename_product_folder,
+    rename_storyboard_project,
     replace_storyboard_timeline_clips,
     save_analysis,
     save_analysis_error,
@@ -782,6 +783,17 @@ async def storyboards_import(req: ImportStoryboardRequest):
         save_storyboard_project,
         _storyboard_save_payload(req, candidate_snapshot, result, "imported"),
     )
+
+
+@app.patch("/api/storyboards/{storyboard_id}")
+async def storyboards_rename(storyboard_id: str, req: dict):
+    new_name = (req.get("productName") or "").strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="Tên storyboard không được để trống.")
+    result = await asyncio.to_thread(rename_storyboard_project, storyboard_id, new_name)
+    if not result:
+        raise HTTPException(status_code=404, detail="Storyboard not found")
+    return result
 
 
 @app.delete("/api/storyboards/{storyboard_id}")

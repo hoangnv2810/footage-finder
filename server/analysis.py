@@ -405,13 +405,19 @@ def normalize_imported_storyboard(
             )
         by_beat_id[beat_id] = normalized_matches
 
+    imported_model = str(payload.get("model") or "").strip()
+
+    models = get_model_config()
+    if imported_model:
+        models["imported_model"] = imported_model
+
     return {
         "beats": beats,
         "beatMatches": [
             {"beatId": beat["id"], "matches": by_beat_id.get(beat["id"], [])}
             for beat in beats
         ],
-        "models": get_model_config(),
+        "models": models,
     }
 
 

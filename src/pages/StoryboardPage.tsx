@@ -52,6 +52,7 @@ interface StoryboardPageProps {
   onImportStoryboard: (rawJson: string) => void | Promise<void>;
   onSelectSavedStoryboard: (id: string) => void;
   onDeleteSavedStoryboard: (id: string) => void;
+  onRenameSavedStoryboard: (id: string, name: string) => void;
   onToggleSourceVersion: (versionId: string, checked: boolean) => void;
   onGenerateStoryboard: () => void;
   onSelectBeat: (beatId: string) => void;
@@ -114,6 +115,7 @@ export function StoryboardPage({
   onImportStoryboard,
   onSelectSavedStoryboard,
   onDeleteSavedStoryboard,
+  onRenameSavedStoryboard,
   onToggleSourceVersion,
   onGenerateStoryboard,
   onSelectBeat,
@@ -298,6 +300,7 @@ export function StoryboardPage({
                         onImportStoryboard={onImportStoryboard}
                         onSelectSavedStoryboard={onSelectSavedStoryboard}
                         onDeleteSavedStoryboard={onDeleteSavedStoryboard}
+                        onRenameSavedStoryboard={onRenameSavedStoryboard}
                         isImportingStoryboard={isGeneratingStoryboard}
                       />
                     </div>
@@ -332,7 +335,7 @@ export function StoryboardPage({
           <div className="px-3 py-2.5 border-b border-border shrink-0">
             <h3 className="text-xs font-semibold text-secondary-foreground">Danh sách beat</h3>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar">
+          <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
             <StoryboardBeatList
               beats={beatViews}
               selectedBeatId={selectedStoryboardBeatId}

@@ -1,11 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { ChevronDown, Copy, FileText, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { SavedStoryboard } from '@/lib/footage-app';
+
+function getModelBadgeStyle(model: string): string {
+  const lower = model.toLowerCase();
+  if (lower.includes('claude')) return 'border-orange-400/60 bg-orange-400/10 text-orange-300';
+  if (lower.includes('gemini')) return 'border-blue-400/60 bg-blue-400/10 text-blue-300';
+  if (lower.includes('gpt') || lower.includes('openai')) return 'border-emerald-400/60 bg-emerald-400/10 text-emerald-300';
+  if (lower.includes('qwen')) return 'border-purple-400/60 bg-purple-400/10 text-purple-300';
+  if (lower.includes('deepseek')) return 'border-cyan-400/60 bg-cyan-400/10 text-cyan-300';
+  return 'border-muted-foreground/40 bg-secondary text-secondary-foreground';
+}
+
+function getModelBadgeColor(model: string): string {
+  const lower = model.toLowerCase();
+  if (lower.includes('claude')) return 'text-orange-300';
+  if (lower.includes('gemini')) return 'text-blue-300';
+  if (lower.includes('gpt') || lower.includes('openai')) return 'text-emerald-300';
+  if (lower.includes('qwen')) return 'text-purple-300';
+  if (lower.includes('deepseek')) return 'text-cyan-300';
+  return 'text-muted-foreground';
+}
 
 const TONE_OPTIONS = [
   {
@@ -113,6 +133,7 @@ interface StoryboardInputPanelProps {
   onImportStoryboard: (rawJson: string) => void | Promise<void>;
   onSelectSavedStoryboard: (id: string) => void;
   onDeleteSavedStoryboard: (id: string) => void;
+  onRenameSavedStoryboard: (id: string, name: string) => void;
   isImportingStoryboard?: boolean;
 }
 
@@ -139,12 +160,29 @@ export function StoryboardInputPanel({
   onImportStoryboard,
   onSelectSavedStoryboard,
   onDeleteSavedStoryboard,
+  onRenameSavedStoryboard,
   isImportingStoryboard = false,
 }: StoryboardInputPanelProps) {
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [rawJson, setRawJson] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<SavedStoryboard | null>(null);
+  const [renameTarget, setRenameTarget] = useState<SavedStoryboard | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [scriptViewTarget, setScriptViewTarget] = useState<SavedStoryboard | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
 
   const submitImport = async () => {
     try {
@@ -359,17 +397,67 @@ export function StoryboardInputPanel({
                   <div key={item.id} className={`flex items-center gap-2 rounded-md border px-2 py-2 ${selectedStoryboardId === item.id ? 'border-primary/60 bg-primary/10' : 'border-border bg-background'}`}>
                     <button onClick={() => onSelectSavedStoryboard(item.id)} className="min-w-0 flex-1 text-left" title={name}>
                       <span className="block truncate text-xs font-medium text-foreground">{name}</span>
-                      <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                        {item.beatCount} beat · {formatSavedSource(item.source)} · {formatSavedTime(item.updatedAt)}
+                      <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-foreground/70">
+                        <span>{item.beatCount} beat · {formatSavedTime(item.updatedAt)}{item.importedModel ? <span className={` ${getModelBadgeColor(item.importedModel)}`}> · {item.importedModel}</span> : null}</span>
                       </span>
                     </button>
-                    <button
-                      onClick={() => setDeleteTarget(item)}
-                      aria-label={`Xóa storyboard ${name}`}
-                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-badge-error"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div ref={openMenuId === item.id ? menuRef : undefined} className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                        className="cursor-pointer rounded-lg border border-transparent p-1.5 text-muted-foreground"
+                        aria-label={`Mở menu storyboard ${name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuId === item.id}
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </button>
+
+                      {openMenuId === item.id ? (
+                        <div
+                          role="menu"
+                          className="absolute right-0 top-8 z-20 min-w-[7rem] overflow-hidden rounded border border-border bg-card p-1 shadow-sm"
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setRenameTarget(item);
+                              setRenameValue(item.productName);
+                            }}
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-surface-hover"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Sửa tên
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setScriptViewTarget(item);
+                            }}
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-surface-hover"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            Chi tiết
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setDeleteTarget(item);
+                            }}
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-destructive transition-colors hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Xóa
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 );
               })}
@@ -438,6 +526,92 @@ export function StoryboardInputPanel({
             >
               Xóa
             </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!renameTarget} onOpenChange={(nextOpen) => { if (!nextOpen) setRenameTarget(null); }}>
+        <DialogContent className="rounded-md border-border bg-card p-0 sm:max-w-md">
+          <DialogHeader className="border-b border-border px-4 py-2">
+            <DialogTitle className="text-base font-semibold">Sửa tên storyboard</DialogTitle>
+          </DialogHeader>
+          <div className="px-4 py-3">
+            <label className="mb-1 block text-sm font-normal text-foreground" htmlFor="rename-storyboard-input">Tên mới</label>
+            <input
+              id="rename-storyboard-input"
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              placeholder="Nhập tên storyboard"
+            />
+          </div>
+          <DialogFooter className="px-4 pb-2 pt-1">
+            <DialogClose asChild>
+              <button className="rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
+                Hủy
+              </button>
+            </DialogClose>
+            <button
+              onClick={() => {
+                if (!renameTarget || !renameValue.trim()) return;
+                onRenameSavedStoryboard(renameTarget.id, renameValue.trim());
+                setRenameTarget(null);
+              }}
+              disabled={!renameValue.trim()}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+            >
+              Lưu
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!scriptViewTarget} onOpenChange={(nextOpen) => { if (!nextOpen) setScriptViewTarget(null); }}>
+        <DialogContent aria-describedby={undefined} className="rounded-md border-border bg-card p-0 sm:max-w-2xl">
+          <DialogHeader className="border-b border-border px-4 py-2">
+            <DialogTitle className="text-base font-semibold">Thông tin — {scriptViewTarget?.productName || 'Chưa nhập sản phẩm'}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto px-4 py-3 space-y-3 custom-scrollbar">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Giới tính:</span>{' '}
+                <span className="text-foreground">{scriptViewTarget?.category || '—'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Độ tuổi:</span>{' '}
+                <span className="text-foreground">{scriptViewTarget?.targetAudience || '—'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Vùng miền:</span>{' '}
+                <span className="text-foreground">{scriptViewTarget?.keyBenefits || '—'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Tone giọng:</span>{' '}
+                <span className="text-foreground">{(scriptViewTarget?.tone && TONE_OPTIONS.find((t) => t.value === scriptViewTarget.tone)?.label) || scriptViewTarget?.tone || '—'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Nguồn:</span>{' '}
+                <span className="text-foreground">{scriptViewTarget ? formatSavedSource(scriptViewTarget.source) : '—'}</span>
+              </div>
+              {scriptViewTarget?.importedModel ? (
+                <div>
+                  <span className="text-muted-foreground">Model:</span>{' '}
+                  <span className="text-foreground">{scriptViewTarget.importedModel}</span>
+                </div>
+              ) : null}
+            </div>
+            <div>
+              <span className="block text-sm font-medium text-muted-foreground mb-1">Kịch bản</span>
+              <pre className="whitespace-pre-wrap text-sm text-foreground rounded-md border border-border bg-background p-3">{scriptViewTarget?.scriptText || 'Không có kịch bản.'}</pre>
+            </div>
+          </div>
+          <DialogFooter className="px-4 pb-2 pt-1">
+            <DialogClose asChild>
+              <button className="rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-surface-hover">
+                Đóng
+              </button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -931,6 +931,15 @@ function WorkspaceApp() {
     }
   };
 
+  const renameSavedStoryboard = async (id: string, newName: string) => {
+    try {
+      const updated = await api.renameStoryboard(id, newName);
+      setSavedStoryboards((prev) => prev.map((item) => item.id === id ? { ...item, productName: updated.productName, updatedAt: updated.updatedAt } : item));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể đổi tên storyboard.');
+    }
+  };
+
   const runStoryboardTimelineMutation = useCallback(async <T,>(mutation: () => Promise<T>): Promise<T | null> => {
     if (storyboardTimelineLoadingRef.current || storyboardTimelineMutatingRef.current) return null;
 
@@ -1623,6 +1632,7 @@ function WorkspaceApp() {
               onImportStoryboard={importStoryboard}
               onSelectSavedStoryboard={selectSavedStoryboard}
               onDeleteSavedStoryboard={deleteSavedStoryboard}
+              onRenameSavedStoryboard={renameSavedStoryboard}
               onToggleSourceVersion={(versionId, checked) => {
                 setStoryboardSelectedVersionIds((prev) => (
                   checked ? [...prev, versionId] : prev.filter((id) => id !== versionId)

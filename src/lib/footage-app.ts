@@ -146,6 +146,7 @@ export interface StoryboardResult {
     video_analysis_model: string;
     script_planning_model: string;
     scene_matching_model: string;
+    imported_model?: string;
   };
 }
 
@@ -214,6 +215,7 @@ export interface SavedStoryboard {
   source: 'generated' | 'imported';
   folder?: ProductFolderSummary | null;
   beatCount: number;
+  importedModel: string;
   result?: StoryboardResult;
 }
 
@@ -257,6 +259,7 @@ export const buildStoryboardCopyPrompt = (input: {
   candidate_scenes: StoryboardCandidateScene[];
 }) => {
   const outputSchema = {
+    model: 'Your model name (e.g. gpt-4o, claude-sonnet-4, qwen3.6-plus)',
     beats: [
       {
         id: 'beat-1',
@@ -285,12 +288,13 @@ export const buildStoryboardCopyPrompt = (input: {
 
   return [
     'Bạn là chuyên gia dựng storyboard video marketing. Hãy phân tích product context, script_text và candidate_scenes để chọn footage phù hợp cho từng beat.',
-    'Return ONLY valid JSON. Do not include markdown fences, comments, or any extra prose.',
+    'Return ONLY valid JSON wrapped in a ```json code fence. Do not include comments or any extra prose outside the code fence.',
     `product_context: ${JSON.stringify(input.product, null, 2)}`,
     `script_text: ${JSON.stringify(input.script_text, null, 2)}`,
     `candidate_scenes: ${JSON.stringify(input.candidate_scenes, null, 2)}`,
     `required_output_schema: ${JSON.stringify(outputSchema, null, 2)}`,
     'Use only candidateId values that exist as candidate_id in candidate_scenes.',
+    'The "model" field MUST contain your actual model identifier (e.g. gpt-4o, claude-sonnet-4, qwen3.6-plus).',
   ].join('\n\n');
 };
 
@@ -512,6 +516,18 @@ export const api = {
 
   async deleteStoryboard(id: string): Promise<{ deleted: boolean }> {
     const res = await fetch(`/api/storyboards/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res));
+    }
+    return res.json();
+  },
+
+  async renameStoryboard(id: string, productName: string): Promise<SavedStoryboard> {
+    const res = await fetch(`/api/storyboards/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productName }),
+    });
     if (!res.ok) {
       throw new Error(await readErrorDetail(res));
     }

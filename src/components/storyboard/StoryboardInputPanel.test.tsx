@@ -20,6 +20,7 @@ const savedStoryboard: SavedStoryboard = {
   candidateSnapshot: [],
   source: 'imported',
   beatCount: 3,
+  importedModel: '',
 };
 
 describe('StoryboardInputPanel', () => {
@@ -48,6 +49,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
       />,
     );
 
@@ -88,6 +90,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={onImportStoryboard}
         onSelectSavedStoryboard={onSelectSavedStoryboard}
         onDeleteSavedStoryboard={onDeleteSavedStoryboard}
+        onRenameSavedStoryboard={vi.fn()}
       />,
     );
 
@@ -146,6 +149,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={onDeleteSavedStoryboard}
+        onRenameSavedStoryboard={vi.fn()}
       />,
     );
 
@@ -182,6 +186,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={onImportStoryboard}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
       />,
     );
 
@@ -219,6 +224,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         isImportingStoryboard
       />,
     );
@@ -253,6 +259,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
       />,
     );
 
@@ -291,6 +298,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
       />,
     );
 
@@ -327,6 +335,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
       />,
     );
 
@@ -361,6 +370,7 @@ describe('StoryboardInputPanel', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
       />,
     );
 

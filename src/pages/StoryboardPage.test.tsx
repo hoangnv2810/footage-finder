@@ -59,6 +59,7 @@ describe('StoryboardPage', () => {
             candidateSnapshot: [],
             source: 'generated',
             beatCount: 6,
+            importedModel: '',
             folder: { id: 12, name: 'Loa', isSystem: false },
           },
           {
@@ -76,6 +77,7 @@ describe('StoryboardPage', () => {
             candidateSnapshot: [],
             source: 'imported',
             beatCount: 5,
+            importedModel: 'gpt-4o',
             folder: { id: 12, name: 'Loa', isSystem: false },
           },
         ]}
@@ -101,6 +103,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -166,6 +169,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -235,6 +239,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -291,6 +296,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -355,6 +361,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -425,6 +432,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -481,6 +489,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -543,6 +552,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -609,6 +619,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -675,6 +686,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -739,6 +751,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -799,6 +812,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
@@ -896,6 +910,7 @@ describe('StoryboardPage', () => {
         onImportStoryboard={vi.fn()}
         onSelectSavedStoryboard={vi.fn()}
         onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
         onToggleSourceVersion={vi.fn()}
         onGenerateStoryboard={vi.fn()}
         onSelectBeat={vi.fn()}
