@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 
 import { AlertCircle } from 'lucide-react';
@@ -93,6 +93,7 @@ function WorkspaceApp() {
   const [storyboardResult, setStoryboardResult] = useState<StoryboardResult | null>(null);
   const [savedStoryboards, setSavedStoryboards] = useState<SavedStoryboard[]>([]);
   const [selectedSavedStoryboardId, setSelectedSavedStoryboardId] = useState<string | null>(null);
+  const [loadingSavedStoryboardId, setLoadingSavedStoryboardId] = useState<string | null>(null);
   const [selectedStoryboardBeatId, setSelectedStoryboardBeatId] = useState<string | null>(null);
   const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
   const [storyboardPreviewMatch, setStoryboardPreviewMatch] = useState<StoryboardMatch | null>(null);
@@ -907,12 +908,30 @@ function WorkspaceApp() {
   };
 
   const selectSavedStoryboard = async (id: string) => {
+    if (loadingSavedStoryboardId === id) return;
+    // Optimistic UI: mark item as selected and loading immediately
+    setSelectedSavedStoryboardId(id);
+
+    // Use cached version if already fetched (has `result`)
+    const cached = savedStoryboards.find((item) => item.id === id && item.result);
+    if (cached) {
+      startTransition(() => {
+        restoreSavedStoryboard(cached);
+      });
+      return;
+    }
+
+    setLoadingSavedStoryboardId(id);
     try {
       const saved = await api.getStoryboard(id);
-      upsertSavedStoryboard(saved);
-      restoreSavedStoryboard(saved);
+      startTransition(() => {
+        upsertSavedStoryboard(saved);
+        restoreSavedStoryboard(saved);
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể mở storyboard đã lưu.');
+    } finally {
+      setLoadingSavedStoryboardId(null);
     }
   };
 
@@ -1606,6 +1625,7 @@ function WorkspaceApp() {
               storyboardResult={storyboardResult}
               savedStoryboards={currentSavedStoryboards}
               selectedSavedStoryboardId={selectedSavedStoryboardId}
+              loadingSavedStoryboardId={loadingSavedStoryboardId}
               selectedStoryboardBeatId={selectedStoryboardBeatId}
               storyboardPreviewMatch={storyboardPreviewMatch}
               storyboardTimelines={storyboardTimelines}

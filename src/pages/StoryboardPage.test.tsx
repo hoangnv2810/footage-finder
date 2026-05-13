@@ -82,6 +82,7 @@ describe('StoryboardPage', () => {
           },
         ]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -148,6 +149,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -218,6 +220,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -275,6 +278,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -340,6 +344,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -411,6 +416,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -468,6 +474,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -531,6 +538,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -598,6 +606,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -665,6 +674,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -730,6 +740,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -790,6 +801,7 @@ describe('StoryboardPage', () => {
         storyboardResult={null}
         savedStoryboards={[]}
         selectedSavedStoryboardId={null}
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId={null}
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}
@@ -889,6 +901,7 @@ describe('StoryboardPage', () => {
         storyboardResult={storyboardResult}
         savedStoryboards={[]}
         selectedSavedStoryboardId="storyboard-1"
+        loadingSavedStoryboardId={null}
         selectedStoryboardBeatId="beat-1"
         storyboardPreviewMatch={null}
         {...storyboardTimelineProps}

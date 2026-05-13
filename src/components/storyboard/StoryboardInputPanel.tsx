@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { ChevronDown, Copy, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, FileText, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -127,6 +127,7 @@ interface StoryboardInputPanelProps {
   setScript: (v: string) => void;
   savedStoryboards: SavedStoryboard[];
   selectedStoryboardId: string | null;
+  loadingStoryboardId: string | null;
   folderName: string;
   onCopyInput: () => void;
   onCopyScriptPrompt: () => void;
@@ -154,6 +155,7 @@ export function StoryboardInputPanel({
   setScript,
   savedStoryboards,
   selectedStoryboardId,
+  loadingStoryboardId,
   folderName,
   onCopyInput,
   onCopyScriptPrompt,
@@ -393,10 +395,14 @@ export function StoryboardInputPanel({
             <div className="space-y-2">
               {savedStoryboards.map((item) => {
                 const name = item.productName || 'Chưa nhập sản phẩm';
+                const isLoading = loadingStoryboardId === item.id;
                 return (
                   <div key={item.id} className={`flex items-center gap-2 rounded-md border px-2 py-2 ${selectedStoryboardId === item.id ? 'border-primary/60 bg-primary/10' : 'border-border bg-background'}`}>
-                    <button onClick={() => onSelectSavedStoryboard(item.id)} className="min-w-0 flex-1 text-left" title={name}>
-                      <span className="block truncate text-xs font-medium text-foreground">{name}</span>
+                    <button onClick={() => onSelectSavedStoryboard(item.id)} className="min-w-0 flex-1 text-left" title={name} disabled={isLoading}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="block truncate text-xs font-medium text-foreground">{name}</span>
+                        {isLoading ? <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" /> : null}
+                      </span>
                       <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-foreground/70">
                         <span>{item.beatCount} beat · {formatSavedTime(item.updatedAt)}{item.importedModel ? <span className={` ${getModelBadgeColor(item.importedModel)}`}> · {item.importedModel}</span> : null}</span>
                       </span>

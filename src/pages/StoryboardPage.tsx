@@ -26,6 +26,7 @@ interface StoryboardPageProps {
   storyboardResult: StoryboardResult | null;
   savedStoryboards: SavedStoryboard[];
   selectedSavedStoryboardId: string | null;
+  loadingSavedStoryboardId: string | null;
   selectedStoryboardBeatId: string | null;
   storyboardPreviewMatch: StoryboardMatch | null;
   storyboardTimelines: StoryboardTimeline[];
@@ -89,6 +90,7 @@ export function StoryboardPage({
   storyboardResult,
   savedStoryboards,
   selectedSavedStoryboardId,
+  loadingSavedStoryboardId,
   selectedStoryboardBeatId,
   storyboardPreviewMatch,
   storyboardTimelines,
@@ -294,6 +296,7 @@ export function StoryboardPage({
                         setScript={onStoryboardScriptChange}
                         savedStoryboards={savedStoryboards}
                         selectedStoryboardId={selectedSavedStoryboardId}
+                        loadingStoryboardId={loadingSavedStoryboardId}
                         folderName={folderName}
                         onCopyInput={onCopyInput}
                         onCopyScriptPrompt={onCopyScriptPrompt}
