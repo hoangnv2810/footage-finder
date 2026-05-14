@@ -1119,7 +1119,7 @@ function WorkspaceApp() {
     }
   }, [buildStoryboardTimelineInputs, getSelectedStoryboardTimeline, persistTimelineClips, selectedSavedStoryboardId, storyboardResult]);
 
-  const moveTimelineClip = useCallback(async (clipId: string, direction: 'up' | 'down') => {
+  const moveTimelineClip = useCallback((clipId: string, direction: 'up' | 'down') => {
     const timeline = getSelectedStoryboardTimeline();
     if (!timeline || timeline.storyboardId !== selectedSavedStoryboardId) return;
 
@@ -1130,39 +1130,39 @@ function WorkspaceApp() {
     const nextClips = [...timeline.clips];
     [nextClips[currentIndex], nextClips[nextIndex]] = [nextClips[nextIndex], nextClips[currentIndex]];
 
-    try {
-      await persistTimelineClips(timeline.id, nextClips.map(timelineClipToInput));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể sắp xếp timeline.');
-    }
-  }, [getSelectedStoryboardTimeline, persistTimelineClips, selectedSavedStoryboardId]);
+    setStoryboardTimelines((prev) => prev.map((t) =>
+      t.id === timeline.id ? { ...t, clips: nextClips } : t
+    ));
+  }, [getSelectedStoryboardTimeline, selectedSavedStoryboardId]);
 
-  const removeTimelineClip = useCallback(async (clipId: string) => {
+  const removeTimelineClip = useCallback((clipId: string) => {
     const timeline = getSelectedStoryboardTimeline();
     if (!timeline || timeline.storyboardId !== selectedSavedStoryboardId) return;
 
-    try {
-      await persistTimelineClips(timeline.id, timeline.clips.filter((clip) => clip.id !== clipId).map(timelineClipToInput));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể xoá clip khỏi timeline.');
-    }
-  }, [getSelectedStoryboardTimeline, persistTimelineClips, selectedSavedStoryboardId]);
+    setStoryboardTimelines((prev) => prev.map((t) =>
+      t.id === timeline.id ? { ...t, clips: t.clips.filter((clip) => clip.id !== clipId) } : t
+    ));
+  }, [getSelectedStoryboardTimeline, selectedSavedStoryboardId]);
 
-  const clearTimelineClips = useCallback(async () => {
+  const clearTimelineClips = useCallback(() => {
     const timeline = getSelectedStoryboardTimeline();
     if (!timeline || timeline.storyboardId !== selectedSavedStoryboardId) return;
 
-    try {
-      await persistTimelineClips(timeline.id, []);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể xoá clip trong timeline.');
-    }
-  }, [getSelectedStoryboardTimeline, persistTimelineClips, selectedSavedStoryboardId]);
+    setStoryboardTimelines((prev) => prev.map((t) =>
+      t.id === timeline.id ? { ...t, clips: [] } : t
+    ));
+  }, [getSelectedStoryboardTimeline, selectedSavedStoryboardId]);
 
   const exportSelectedStoryboardTimeline = useCallback(async (timelineId: string) => {
     if (storyboardTimelineLoadingRef.current || storyboardTimelineMutatingRef.current) return;
     setIsExportingStoryboardTimeline(true);
     try {
+      // Persist current local state before exporting
+      const timeline = storyboardTimelines.find((t) => t.id === timelineId);
+      if (timeline) {
+        await persistTimelineClips(timelineId, timeline.clips.map(timelineClipToInput));
+      }
+
       const blob = await exportStoryboardTimeline(timelineId);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -1177,7 +1177,7 @@ function WorkspaceApp() {
     } finally {
       setIsExportingStoryboardTimeline(false);
     }
-  }, []);
+  }, [persistTimelineClips, storyboardTimelines]);
 
   const analyzeVideos = async () => {
     if (videos.length === 0) {

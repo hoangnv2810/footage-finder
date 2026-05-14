@@ -270,7 +270,7 @@ export function StoryboardTimelinePanel({
                 <li
                   key={clip.id}
                   data-testid={`timeline-clip-item-${clip.id}`}
-                  className="cursor-pointer rounded-md border border-border/60 bg-background/25 px-2.5 py-2 transition-all duration-200 ease-out hover:border-primary/30 hover:bg-surface-hover/70 hover:shadow-sm hover:-translate-y-px"
+                  className="cursor-pointer rounded-md border border-border/60 bg-background/25 px-2.5 py-2 hover:border-primary/30 hover:bg-surface-hover/70"
                 >
                   <div data-testid={`timeline-clip-title-row-${clip.id}`} className="flex items-center justify-between gap-2.5">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -283,7 +283,10 @@ export function StoryboardTimelinePanel({
                     <div className="flex shrink-0 items-center justify-end gap-0.5">
                       <button
                         type="button"
-                        onClick={() => onMoveClip(clip.id, 'up')}
+                        onClick={(e) => {
+                          e.currentTarget.blur();
+                          onMoveClip(clip.id, 'up');
+                        }}
                         disabled={isBusy}
                         aria-label={`Đưa ${clip.label} lên`}
                         title="Lên"
@@ -293,7 +296,10 @@ export function StoryboardTimelinePanel({
                       </button>
                       <button
                         type="button"
-                        onClick={() => onMoveClip(clip.id, 'down')}
+                        onClick={(e) => {
+                          e.currentTarget.blur();
+                          onMoveClip(clip.id, 'down');
+                        }}
                         disabled={isBusy}
                         aria-label={`Đưa ${clip.label} xuống`}
                         title="Xuống"
