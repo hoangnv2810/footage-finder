@@ -35,7 +35,7 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
           </span>
           <div>
             <h3 className="text-sm font-semibold text-foreground">{beat.label}</h3>
-            <p className="text-xs text-muted-foreground">{beat.text}</p>
+            <p className="text-xs text-muted-foreground font-medium">{beat.text}</p>
           </div>
         </div>
       </div>

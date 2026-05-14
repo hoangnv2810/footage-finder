@@ -89,7 +89,7 @@ export function SearchResultCard({
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-sm font-semibold text-foreground truncate">{video.fileName}</span>
             <SourceBadge source={video.source} />
-            <span className="text-[11px] text-muted-foreground">{video.duration}</span>
+            <span className="text-[11px] text-muted-foreground font-medium">{video.duration}</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <div className="relative">
@@ -151,7 +151,7 @@ export function SearchResultCard({
               />
               {activeScene ? (
                 <div className="px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">@ {activeScene.startTime}s</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">@ {activeScene.startTime}s</p>
                 </div>
               ) : null}
             </div>
@@ -190,7 +190,7 @@ export function SearchResultCard({
                           <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-primary/15 text-primary">
                             <Play className="h-2.5 w-2.5" />
                           </span>
-                          <span>{scene.startTime}s - {scene.endTime}s</span>
+                          <span className="text-[11px] text-muted-foreground font-medium">{scene.startTime}s - {scene.endTime}s</span>
                         </div>
                         <button
                           onClick={(event) => {

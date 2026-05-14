@@ -25,8 +25,8 @@ export function StoryboardMatchCard({ match, isActive, onPreview, onTrim, onAddT
             {match.score}
           </span>
           <div className="min-w-0">
-            <p className="text-xs text-foreground font-medium truncate">{match.fileName}</p>
-            <p className="text-[11px] text-muted-foreground">{match.sceneStart}s – {match.sceneEnd}s</p>
+            <p className="text-xs text-foreground font-semibold truncate">{match.fileName}</p>
+            <p className="text-[11px] text-muted-foreground font-medium">{match.sceneStart}s – {match.sceneEnd}s</p>
           </div>
         </div>
         <span className={cn('px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 whitespace-nowrap', match.usageType === 'direct_product' ? 'bg-primary/15 text-primary' : 'bg-badge-web/15 text-badge-web')}>
@@ -34,24 +34,14 @@ export function StoryboardMatchCard({ match, isActive, onPreview, onTrim, onAddT
         </span>
       </div>
 
-      <p className="text-xs text-muted-foreground mb-1.5 leading-relaxed">{match.matchReason}</p>
+      <p className="text-xs text-muted-foreground font-medium mb-1.5 leading-relaxed">{match.matchReason}</p>
 
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground mb-2.5 flex-wrap">
-        {match.mood ? <span className="px-1.5 py-0.5 rounded bg-muted">{match.mood}</span> : null}
-        {match.shotType ? <span className="px-1.5 py-0.5 rounded bg-muted">{match.shotType}</span> : null}
+      <div className="flex items-center gap-2 text-[11px] font-medium mb-2.5 flex-wrap">
+        {match.mood ? <span className="px-2 py-0.5 rounded bg-muted/50 border border-border/60 text-foreground/80">{match.mood}</span> : null}
+        {match.shotType ? <span className="px-2 py-0.5 rounded bg-muted/50 border border-border/60 text-foreground/80">{match.shotType}</span> : null}
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap">
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onPreview();
-          }}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors"
-        >
-          <Eye className="h-3 w-3" /> Xem
-        </button>
         <button
           type="button"
           onClick={(event) => {

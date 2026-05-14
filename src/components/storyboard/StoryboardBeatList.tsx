@@ -41,13 +41,13 @@ export function StoryboardBeatList({ beats, selectedBeatId, onSelectBeat }: Stor
               <span className="text-xs font-semibold text-foreground">{beat.label}</span>
             </div>
             <div className="flex items-center gap-2">
-              {beat.durationHint ? <span className="text-[11px] text-muted-foreground">{beat.durationHint}</span> : null}
+              {beat.durationHint ? <span className="text-[11px] text-muted-foreground font-medium">{beat.durationHint}</span> : null}
               <span className={cn('px-1.5 py-0.5 rounded text-[11px] font-medium', beat.matches.length > 0 ? 'bg-success/15 text-success' : 'bg-badge-error/15 text-badge-error')}>
                 {beat.matches.length} match
               </span>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{beat.text}</p>
+          <p className="text-xs text-muted-foreground font-medium line-clamp-2 leading-relaxed">{beat.text}</p>
         </button>
       ))}
     </div>

@@ -30,9 +30,9 @@ export function SessionVideoItem({ video, isSelected, onClick }: { video: Sessio
           {video.fileName}
         </span>
       </div>
-      <div className="flex items-center gap-1.5 mt-1 ml-[22px]">
+        <div className="flex items-center gap-1.5 mt-1 ml-[22px]">
         <SourceBadge source={video.source} />
-        <span className="text-[11px] text-muted-foreground">{video.duration}</span>
+        <span className="text-[11px] text-muted-foreground font-medium">{video.duration}</span>
       </div>
     </button>
   );
