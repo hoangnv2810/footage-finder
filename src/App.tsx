@@ -11,6 +11,7 @@ import { FolderFormDialog } from '@/components/library/FolderFormDialog';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { NotFound } from '@/pages/NotFound';
 import { SearchPage } from '@/pages/SearchPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { StoryboardPage } from '@/pages/StoryboardPage';
 import {
   FALLBACK_PRODUCT_NAME,
@@ -58,6 +59,7 @@ export default function App() {
 
 function WorkspaceApp() {
   const navigate = useNavigate();
+  const [previewMutedDefault, setPreviewMutedDefault] = useState(() => readPreviewMutedDefault());
   const [keywords, setKeywords] = useState('');
   const [searchProductName, setSearchProductName] = useState('');
   const [videos, setVideos] = useState<VideoResult[]>([]);
@@ -114,6 +116,11 @@ function WorkspaceApp() {
   const storyboardTimelineMutatingRef = useRef(false);
   const [isUploading, setIsUploading] = useState(false);
   const [libraryViewMode, setLibraryViewMode] = useState<ViewMode>('full');
+
+  const handlePreviewMutedDefaultChange = useCallback((value: boolean) => {
+    setPreviewMutedDefault(value);
+    window.localStorage.setItem(PREVIEW_MUTED_DEFAULT_STORAGE_KEY, value ? 'true' : 'false');
+  }, []);
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
@@ -1543,6 +1550,7 @@ function WorkspaceApp() {
               librarySourceFilter={librarySourceFilter}
               libraryViewMode={libraryViewMode}
               trimmingScene={trimmingScene}
+              previewMutedDefault={previewMutedDefault}
               onSelectSourceFilter={setLibrarySourceFilter}
               onToggleProductGroup={toggleProductGroup}
               onSelectDataset={setActiveDatasetId}
@@ -1585,6 +1593,7 @@ function WorkspaceApp() {
               isAnalyzing={isAnalyzing}
               isUploading={isUploading}
               trimmingScene={trimmingScene}
+              previewMutedDefault={previewMutedDefault}
               uploadInputRef={uploadInputRef}
               onKeywordsChange={setKeywords}
               onSearchProductNameChange={setSearchProductName}
@@ -1637,6 +1646,7 @@ function WorkspaceApp() {
               activeDataset={activeDataset}
               activeDatasetUsableForStoryboard={activeDatasetUsableForStoryboard}
               trimmingScene={trimmingScene}
+              previewMutedDefault={previewMutedDefault}
               onRenameStoryboardFolder={openRenameFolderDialog}
               onSelectStoryboardFolder={(f) => setSelectedStoryboardFolderId(f.id)}
               onDeleteStoryboardFolder={openDeleteFolderDialog}
@@ -1678,6 +1688,15 @@ function WorkspaceApp() {
             />,
           )}
         />
+        <Route
+          path="/settings"
+          element={renderPage(
+            <SettingsPage
+              previewMutedDefault={previewMutedDefault}
+              onPreviewMutedDefaultChange={handlePreviewMutedDefaultChange}
+            />,
+          )}
+        />
         <Route path="*" element={renderPage(<NotFound />)} />
       </Routes>
 
@@ -1708,6 +1727,12 @@ function WorkspaceApp() {
       <Toaster position="top-center" richColors theme="dark" />
     </AppLayout>
   );
+}
+
+const PREVIEW_MUTED_DEFAULT_STORAGE_KEY = 'footage-finder.previewMutedDefault';
+
+function readPreviewMutedDefault() {
+  return window.localStorage.getItem(PREVIEW_MUTED_DEFAULT_STORAGE_KEY) !== 'false';
 }
 
 function getDatasetGroupKey(dataset: DatasetItem) {

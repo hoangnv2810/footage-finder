@@ -24,6 +24,7 @@ interface VideoDetailPanelProps {
   onTrimScene: (scene: LibrarySceneItem) => void;
   trimmingSceneId: string | null;
   videoSrc: string;
+  previewMutedDefault?: boolean;
   onPlayerRef: (node: HTMLVideoElement | null) => void;
   onPlayerLoadedMetadata: () => void;
   onPlayerTimeUpdate: () => void;
@@ -44,6 +45,7 @@ export function VideoDetailPanel({
   onTrimScene,
   trimmingSceneId,
   videoSrc,
+  previewMutedDefault = false,
   onPlayerRef,
   onPlayerLoadedMetadata,
   onPlayerTimeUpdate,
@@ -120,6 +122,7 @@ export function VideoDetailPanel({
             fileName={video.fileName}
             currentTime={activeScene?.startTime}
             videoSrc={videoSrc}
+            previewMutedDefault={previewMutedDefault}
             onPlayerRef={onPlayerRef}
             onLoadedMetadata={onPlayerLoadedMetadata}
             onTimeUpdate={onPlayerTimeUpdate}

@@ -38,6 +38,7 @@ interface StoryboardPageProps {
   activeDataset: DatasetItem | null;
   activeDatasetUsableForStoryboard: boolean;
   trimmingScene: string | null;
+  previewMutedDefault?: boolean;
   onRenameStoryboardFolder: (folder: ProductFolderSummary) => void;
   onSelectStoryboardFolder: (folder: ProductFolderSummary) => void;
   onDeleteStoryboardFolder?: (folder: ProductFolderSummary) => void;
@@ -102,6 +103,7 @@ export function StoryboardPage({
   activeDataset,
   activeDatasetUsableForStoryboard,
   trimmingScene,
+  previewMutedDefault = false,
   onRenameStoryboardFolder,
   onSelectStoryboardFolder,
   onDeleteStoryboardFolder,
@@ -353,6 +355,7 @@ export function StoryboardPage({
               beat={selectedBeatView}
               previewMatch={previewMatchView}
               trimmingSceneId={toTrimMatchId(selectedBeatView, storyboardPreviewMatch?.id || null, trimmingScene)}
+              previewMutedDefault={previewMutedDefault}
               onPreviewMatch={(match) => onPlayStoryboardMatch(match.rawMatch)}
               onTrimMatch={(match) => onTrimMatch(match.rawMatch)}
               onAddMatchToTimeline={(match) => onAddMatchToTimeline(match.rawMatch)}

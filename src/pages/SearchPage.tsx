@@ -15,6 +15,7 @@ interface SearchPageProps {
   isAnalyzing: boolean;
   isUploading: boolean;
   trimmingScene: string | null;
+  previewMutedDefault?: boolean;
   uploadInputRef: RefObject<HTMLInputElement | null>;
   onKeywordsChange: (value: string) => void;
   onSearchProductNameChange: (value: string) => void;
@@ -38,6 +39,7 @@ export function SearchPage({
   isAnalyzing,
   isUploading,
   trimmingScene,
+  previewMutedDefault = false,
   uploadInputRef,
   onKeywordsChange,
   onSearchProductNameChange,
@@ -113,6 +115,7 @@ export function SearchPage({
                     onTrimScene={(scene) => originalVideo && onTrimScene(originalVideo, scene.rawScene, scene.sceneIndex)}
                     trimmingSceneId={trimSceneId}
                     videoSrc={`/api/videos/${encodeURIComponent(video.fileName)}/stream`}
+                    previewMutedDefault={previewMutedDefault}
                     onPlayerRef={(node) => onSearchPlayerRef(originalIndex, node)}
                     onPlayerLoadedMetadata={() => onPlayerLoadedMetadata(originalIndex)}
                     onPlayerTimeUpdate={() => onPlayerTimeUpdate(originalIndex)}

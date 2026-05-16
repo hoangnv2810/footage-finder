@@ -1,4 +1,4 @@
-import { Database, Film, Search } from 'lucide-react';
+import { Database, Film, Search, Settings } from 'lucide-react';
 
 import { NavLink } from '@/components/NavLink';
 
@@ -6,6 +6,7 @@ const items = [
   { title: 'Thư viện dữ liệu', url: '/', icon: Database, end: true },
   { title: 'Tìm phân cảnh', url: '/search', icon: Search },
   { title: 'Storyboard', url: '/storyboard', icon: Film },
+  { title: 'Cài đặt', url: '/settings', icon: Settings },
 ];
 
 export function AppSidebar({ collapsed }: { collapsed: boolean }) {

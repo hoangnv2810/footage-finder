@@ -7,6 +7,7 @@ interface StoryboardPreviewPanelProps {
   beat: StoryboardBeatView | null;
   previewMatch: BeatMatchView | null;
   trimmingSceneId: string | null;
+  previewMutedDefault?: boolean;
   onPreviewMatch: (match: BeatMatchView) => void;
   onTrimMatch: (match: BeatMatchView) => void;
   onAddMatchToTimeline: (match: BeatMatchView) => void;
@@ -14,7 +15,7 @@ interface StoryboardPreviewPanelProps {
   onTimeUpdate: () => void;
 }
 
-export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, onPreviewMatch, onTrimMatch, onAddMatchToTimeline, onPlayerRef, onTimeUpdate }: StoryboardPreviewPanelProps) {
+export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, previewMutedDefault = false, onPreviewMatch, onTrimMatch, onAddMatchToTimeline, onPlayerRef, onTimeUpdate }: StoryboardPreviewPanelProps) {
   if (!beat) {
     return (
       <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
@@ -56,10 +57,12 @@ export function StoryboardPreviewPanel({ beat, previewMatch, trimmingSceneId, on
               {previewMatch ? (
                 <div className="rounded-lg bg-black/40 overflow-hidden h-full max-h-full xl:max-h-[calc(100%-1rem)]">
                   <video
+                    data-testid="storyboard-preview-video"
                     key={previewMatch.fileName}
                     ref={onPlayerRef}
                     src={`/api/videos/${encodeURIComponent(previewMatch.fileName)}/stream`}
                     preload="auto"
+                    muted={previewMutedDefault}
                     onTimeUpdate={onTimeUpdate}
                     controls
                     className="h-full bg-black object-contain"

@@ -15,6 +15,7 @@ interface LibraryPageProps {
   librarySourceFilter: DatasetSourceFilter;
   libraryViewMode: ViewMode;
   trimmingScene: string | null;
+  previewMutedDefault?: boolean;
   onSelectSourceFilter: (filter: DatasetSourceFilter) => void;
   onToggleProductGroup: (groupKey: string) => void;
   onSelectDataset: (datasetId: string) => void;
@@ -48,6 +49,7 @@ export function LibraryPage({
   librarySourceFilter,
   libraryViewMode,
   trimmingScene,
+  previewMutedDefault = false,
   onSelectSourceFilter,
   onToggleProductGroup,
   onSelectDataset,
@@ -138,6 +140,7 @@ export function LibraryPage({
               onTrimScene={(scene) => onTrimScene(scene.rawScene, scene.sceneIndex)}
               trimmingSceneId={toTrimSceneId(activeDataset.fileName, trimmingScene, selectedVideo, libraryViewMode)}
               videoSrc={`/api/videos/${encodeURIComponent(activeDataset.fileName)}/stream`}
+              previewMutedDefault={previewMutedDefault}
               onPlayerRef={onLibraryPlayerRef}
               onPlayerLoadedMetadata={onPlayerLoadedMetadata}
               onPlayerTimeUpdate={onPlayerTimeUpdate}

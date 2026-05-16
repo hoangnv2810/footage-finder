@@ -63,6 +63,24 @@ const beat: StoryboardBeatView = {
 };
 
 describe('StoryboardPreviewPanel', () => {
+  it('starts the selected match preview muted when the default preview audio setting is off', () => {
+    render(
+      <StoryboardPreviewPanel
+        beat={beat}
+        previewMatch={match}
+        trimmingSceneId={null}
+        previewMutedDefault={true}
+        onPreviewMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onAddMatchToTimeline={vi.fn()}
+        onPlayerRef={vi.fn()}
+        onTimeUpdate={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('storyboard-preview-video')).toHaveProperty('muted', true);
+  });
+
   it('omits preview and match section headings while keeping fixed-width beat number badge', () => {
     render(
       <StoryboardPreviewPanel

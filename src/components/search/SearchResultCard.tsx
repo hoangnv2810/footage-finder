@@ -19,6 +19,7 @@ interface SearchResultCardProps {
   onTrimScene: (scene: SessionScene) => void;
   trimmingSceneId: string | null;
   videoSrc: string;
+  previewMutedDefault?: boolean;
   onPlayerRef: (node: HTMLVideoElement | null) => void;
   onPlayerLoadedMetadata: () => void;
   onPlayerTimeUpdate: () => void;
@@ -35,6 +36,7 @@ export function SearchResultCard({
   onTrimScene,
   trimmingSceneId,
   videoSrc,
+  previewMutedDefault = false,
   onPlayerRef,
   onPlayerLoadedMetadata,
   onPlayerTimeUpdate,
@@ -141,9 +143,11 @@ export function SearchResultCard({
           <div className="flex h-full items-center justify-center p-4">
             <div className="w-full max-w-[360px] rounded-md bg-black/40 overflow-hidden">
               <video
+                data-testid="search-preview-video"
                 ref={onPlayerRef}
                 src={videoSrc}
                 preload="metadata"
+                muted={previewMutedDefault}
                 onLoadedMetadata={onPlayerLoadedMetadata}
                 onTimeUpdate={onPlayerTimeUpdate}
                 controls
