@@ -37,7 +37,7 @@ describe('SettingsPage', () => {
 
     expect(screen.getByText('Preview behavior')).toBeInTheDocument();
     expect(screen.getByText('Đang tắt loa mặc định')).toBeInTheDocument();
-    expect(screen.getByText('Mute-first')).toBeInTheDocument();
+    expect(screen.queryByText('Mute-first')).not.toBeInTheDocument();
   });
 
   it('lets users choose whether opening the timeline hides the source column', () => {
