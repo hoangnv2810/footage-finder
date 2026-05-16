@@ -387,7 +387,7 @@ describe('StoryboardPreviewPanel', () => {
     }
   });
 
-  it('plays the matching scene from the explicit preview action', () => {
+  it('does not render the removed explicit preview action', () => {
     const onPreviewMatch = vi.fn();
 
     render(
@@ -403,10 +403,8 @@ describe('StoryboardPreviewPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Xem' }));
-
-    expect(onPreviewMatch).toHaveBeenCalledTimes(1);
-    expect(onPreviewMatch).toHaveBeenCalledWith(match);
+    expect(screen.queryByRole('button', { name: 'Xem' })).not.toBeInTheDocument();
+    expect(onPreviewMatch).not.toHaveBeenCalled();
   });
 
   it('plays the matching scene when clicking the footage match item body', () => {
