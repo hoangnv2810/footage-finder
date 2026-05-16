@@ -151,6 +151,7 @@ export function StoryboardPage({
   const [folderMenuOpenId, setFolderMenuOpenId] = useState<number | null>(null);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(true);
   const [isSourceColumnHidden, setIsSourceColumnHidden] = useState(false);
+  const [isTimelineContentReady, setIsTimelineContentReady] = useState(false);
   const folderMenuRef = useRef<HTMLDivElement | null>(null);
   const folderRows = storyboardFolders.length > 0
     ? storyboardFolders
@@ -161,6 +162,7 @@ export function StoryboardPage({
   const toggleTimelineCollapsed = () => {
     setIsTimelineCollapsed((current) => {
       const next = !current;
+      setIsTimelineContentReady(false);
       if (autoHideSourceColumnOnTimelineOpen) {
         setIsSourceColumnHidden(!next);
       }
@@ -177,6 +179,19 @@ export function StoryboardPage({
       setIsSourceColumnHidden(false);
     }
   }, [autoHideSourceColumnOnTimelineOpen, canUseTimeline]);
+
+  useEffect(() => {
+    if (!canUseTimeline || isTimelineCollapsed) {
+      setIsTimelineContentReady(false);
+      return;
+    }
+
+    const revealTimer = window.setTimeout(() => {
+      setIsTimelineContentReady(true);
+    }, 120);
+
+    return () => window.clearTimeout(revealTimer);
+  }, [canUseTimeline, isTimelineCollapsed]);
 
   useEffect(() => {
     if (folderMenuOpenId === null) return;
@@ -202,8 +217,14 @@ export function StoryboardPage({
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden">
-        {!isSourceColumnHidden ? (
-        <div data-testid="storyboard-source-column" className="w-[360px] border-r border-border shrink-0 flex flex-col bg-card min-h-0 overflow-hidden">
+        <div
+          data-testid="storyboard-source-column"
+          aria-hidden={isSourceColumnHidden}
+          className={`shrink-0 flex flex-col bg-card min-h-0 overflow-hidden transition-[width,opacity,border-color] duration-300 ease-out ${
+            isSourceColumnHidden ? 'w-0 border-r border-transparent opacity-0 pointer-events-none' : 'w-[360px] border-r border-border opacity-100'
+          }`}
+        >
+          <div className="flex h-full min-h-0 w-[360px] flex-col">
           <div className="custom-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
             {folderRows.map((row) => {
               const isActive = row.folder.id === activeFolderId;
@@ -354,8 +375,8 @@ export function StoryboardPage({
               </button>
             </div>
           </div>
+          </div>
         </div>
-        ) : null}
 
         <div className="w-[340px] border-r border-border shrink-0 flex flex-col bg-card min-h-0 overflow-hidden">
           <div className="px-3 py-2.5 border-b border-border shrink-0">
@@ -385,7 +406,7 @@ export function StoryboardPage({
             />
           </div>
 
-          <div data-testid="storyboard-timeline-slot" className={`${showCollapsedTimeline ? 'h-12 xl:h-auto xl:w-12 xl:p-2 p-2' : 'h-[280px] xl:h-auto xl:w-[300px] xl:p-0 2xl:w-[340px] p-0'} w-full shrink-0 border-t border-border bg-card min-h-0 overflow-hidden xl:border-l xl:border-t-0`}>
+          <div data-testid="storyboard-timeline-slot" className={`${showCollapsedTimeline ? 'h-12 xl:h-auto xl:w-12 xl:p-2 p-2' : 'h-[280px] xl:h-auto xl:w-[300px] xl:p-0 2xl:w-[340px] p-0'} w-full shrink-0 border-t border-border bg-card min-h-0 overflow-hidden transition-[width,height,padding] duration-300 ease-out xl:border-l xl:border-t-0`}>
             <StoryboardTimelinePanel
               canUseTimeline={canUseTimeline}
               timelines={storyboardTimelines}
@@ -394,6 +415,7 @@ export function StoryboardPage({
               isLoading={isLoadingStoryboardTimelines}
               isSaving={isMutatingStoryboardTimeline}
               isExporting={isExportingStoryboardTimeline}
+              isContentReady={showCollapsedTimeline ? true : isTimelineContentReady}
               onToggleCollapsed={toggleTimelineCollapsed}
               onCreateTimeline={onCreateStoryboardTimeline}
               onSelectTimeline={onSelectStoryboardTimeline}

@@ -997,14 +997,18 @@ describe('StoryboardPage', () => {
       />,
     );
 
-    expect(screen.getByTestId('storyboard-source-column')).toBeInTheDocument();
+    const sourceColumn = screen.getByTestId('storyboard-source-column');
+    expect(sourceColumn).toBeInTheDocument();
+    expect(sourceColumn).toHaveClass('w-[360px]', 'opacity-100');
 
     fireEvent.click(screen.getByRole('button', { name: 'Mở timeline bản dựng' }));
 
-    expect(screen.queryByTestId('storyboard-source-column')).not.toBeInTheDocument();
+    expect(sourceColumn).toHaveAttribute('aria-hidden', 'true');
+    expect(sourceColumn).toHaveClass('w-0', 'opacity-0', 'pointer-events-none');
 
     fireEvent.click(screen.getByRole('button', { name: 'Thu gọn timeline bản dựng' }));
 
-    expect(screen.getByTestId('storyboard-source-column')).toBeInTheDocument();
+    expect(sourceColumn).toHaveAttribute('aria-hidden', 'false');
+    expect(sourceColumn).toHaveClass('w-[360px]', 'opacity-100');
   });
 });

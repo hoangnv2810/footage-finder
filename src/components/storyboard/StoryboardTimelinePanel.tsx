@@ -14,6 +14,7 @@ export interface StoryboardTimelinePanelProps {
   isLoading: boolean;
   isSaving: boolean;
   isExporting: boolean;
+  isContentReady?: boolean;
   onToggleCollapsed: () => void;
   onCreateTimeline: (name?: string, quickCreate?: boolean) => void;
   onSelectTimeline: (timelineId: string) => void;
@@ -44,6 +45,7 @@ export function StoryboardTimelinePanel({
   isLoading,
   isSaving,
   isExporting,
+  isContentReady = true,
   onToggleCollapsed,
   onCreateTimeline,
   onSelectTimeline,
@@ -128,8 +130,14 @@ export function StoryboardTimelinePanel({
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-md bg-card/50">
+      <div className="flex h-full min-h-0 w-[300px] 2xl:w-[340px] flex-col">
       <div className="border-b border-border px-3 py-2.5">
-        <div className="flex items-center justify-between gap-2">
+        <div
+          className={cn(
+            'flex items-center justify-between gap-2 transition-[opacity,transform] duration-300 ease-out',
+            isContentReady ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0 pointer-events-none',
+          )}
+        >
           <div data-testid="timeline-panel-header" className="min-w-0">
             <h4 className="text-[13px] font-semibold text-white">Timeline bản dựng</h4>
             {isLoading || !selectedTimeline ? (
@@ -161,6 +169,12 @@ export function StoryboardTimelinePanel({
         </div>
       </div>
 
+      <div
+        className={cn(
+          'min-h-0 flex flex-1 flex-col transition-[opacity,transform] duration-300 ease-out',
+          isContentReady ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0 pointer-events-none',
+        )}
+      >
       <div className="border-b border-border">
         <div className="overflow-hidden bg-background/20">
           <button
@@ -346,6 +360,7 @@ export function StoryboardTimelinePanel({
           {isExporting ? 'Đang xuất...' : 'Xuất clip rời (.zip)'}
         </button>
       </div>
+      </div>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="overflow-hidden rounded-md border-border bg-card p-0 sm:max-w-md" aria-describedby={undefined}>
@@ -457,6 +472,7 @@ export function StoryboardTimelinePanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </section>
   );
 }
