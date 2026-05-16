@@ -1,11 +1,18 @@
-import { Check, SlidersHorizontal, Volume2, VolumeX } from 'lucide-react';
+import { Check, PanelLeftClose, SlidersHorizontal, Volume2, VolumeX } from 'lucide-react';
 
 interface SettingsPageProps {
   previewMutedDefault: boolean;
+  autoHideSourceColumnOnTimelineOpen: boolean;
   onPreviewMutedDefaultChange: (value: boolean) => void;
+  onAutoHideSourceColumnOnTimelineOpenChange: (value: boolean) => void;
 }
 
-export function SettingsPage({ previewMutedDefault, onPreviewMutedDefaultChange }: SettingsPageProps) {
+export function SettingsPage({
+  previewMutedDefault,
+  autoHideSourceColumnOnTimelineOpen,
+  onPreviewMutedDefaultChange,
+  onAutoHideSourceColumnOnTimelineOpenChange,
+}: SettingsPageProps) {
   const StatusIcon = previewMutedDefault ? VolumeX : Volume2;
 
   return (
@@ -42,6 +49,7 @@ export function SettingsPage({ previewMutedDefault, onPreviewMutedDefaultChange 
         </div>
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="space-y-4">
           <label className="group relative overflow-hidden rounded-2xl border border-border/80 bg-card p-5 shadow-xl shadow-black/15 transition-colors hover:border-primary/40">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-70" />
             <div className="relative flex items-start justify-between gap-5">
@@ -80,6 +88,46 @@ export function SettingsPage({ previewMutedDefault, onPreviewMutedDefaultChange 
               </div>
             </div>
           </label>
+
+          <label className="group relative overflow-hidden rounded-2xl border border-border/80 bg-card p-5 shadow-xl shadow-black/15 transition-colors hover:border-primary/40">
+            <div className="absolute inset-0 bg-gradient-to-br from-badge-web/10 via-transparent to-transparent opacity-70" />
+            <div className="relative flex items-start justify-between gap-5">
+              <div className="flex min-w-0 gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-badge-web/25 bg-badge-web/10 text-badge-web">
+                  <PanelLeftClose className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-semibold text-foreground">Tự ẩn cột nguồn khi mở timeline</span>
+                    <span className="rounded-full border border-badge-web/25 bg-badge-web/10 px-2 py-0.5 text-[11px] font-bold text-badge-web">Storyboard focus</span>
+                  </div>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    Khi mở timeline bản dựng, cột nguồn dữ liệu bên trái sẽ được ẩn hẳn để nhường không gian dựng clip. Thu gọn timeline sẽ tự mở lại cột này.
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0 pt-1">
+                <input
+                  aria-label="Tự ẩn cột nguồn khi mở timeline"
+                  type="checkbox"
+                  checked={autoHideSourceColumnOnTimelineOpen}
+                  onChange={(event) => onAutoHideSourceColumnOnTimelineOpenChange(event.target.checked)}
+                  className="peer sr-only"
+                />
+                <span className="flex h-7 w-12 items-center rounded-full border border-border bg-secondary p-0.5 transition-colors peer-checked:border-badge-web/50 peer-checked:bg-badge-web/25">
+                  <span
+                    className={`flex h-[22px] w-[22px] items-center justify-center rounded-full text-background shadow-lg transition-transform ${
+                      autoHideSourceColumnOnTimelineOpen ? 'translate-x-5 bg-badge-web' : 'translate-x-0 bg-muted-foreground/60'
+                    }`}
+                  >
+                    {autoHideSourceColumnOnTimelineOpen ? <Check className="h-3.5 w-3.5" /> : null}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </label>
+          </div>
 
           <aside className="rounded-2xl border border-border/80 bg-card/70 p-4">
             <div className="rounded-xl border border-border/70 bg-black/30 p-3">

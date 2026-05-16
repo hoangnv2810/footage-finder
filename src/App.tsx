@@ -60,6 +60,7 @@ export default function App() {
 function WorkspaceApp() {
   const navigate = useNavigate();
   const [previewMutedDefault, setPreviewMutedDefault] = useState(() => readPreviewMutedDefault());
+  const [autoHideSourceColumnOnTimelineOpen, setAutoHideSourceColumnOnTimelineOpen] = useState(() => readAutoHideSourceColumnOnTimelineOpen());
   const [keywords, setKeywords] = useState('');
   const [searchProductName, setSearchProductName] = useState('');
   const [videos, setVideos] = useState<VideoResult[]>([]);
@@ -120,6 +121,11 @@ function WorkspaceApp() {
   const handlePreviewMutedDefaultChange = useCallback((value: boolean) => {
     setPreviewMutedDefault(value);
     window.localStorage.setItem(PREVIEW_MUTED_DEFAULT_STORAGE_KEY, value ? 'true' : 'false');
+  }, []);
+
+  const handleAutoHideSourceColumnOnTimelineOpenChange = useCallback((value: boolean) => {
+    setAutoHideSourceColumnOnTimelineOpen(value);
+    window.localStorage.setItem(AUTO_HIDE_SOURCE_COLUMN_ON_TIMELINE_OPEN_STORAGE_KEY, value ? 'true' : 'false');
   }, []);
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1647,6 +1653,7 @@ function WorkspaceApp() {
               activeDatasetUsableForStoryboard={activeDatasetUsableForStoryboard}
               trimmingScene={trimmingScene}
               previewMutedDefault={previewMutedDefault}
+              autoHideSourceColumnOnTimelineOpen={autoHideSourceColumnOnTimelineOpen}
               onRenameStoryboardFolder={openRenameFolderDialog}
               onSelectStoryboardFolder={(f) => setSelectedStoryboardFolderId(f.id)}
               onDeleteStoryboardFolder={openDeleteFolderDialog}
@@ -1693,7 +1700,9 @@ function WorkspaceApp() {
           element={renderPage(
             <SettingsPage
               previewMutedDefault={previewMutedDefault}
+              autoHideSourceColumnOnTimelineOpen={autoHideSourceColumnOnTimelineOpen}
               onPreviewMutedDefaultChange={handlePreviewMutedDefaultChange}
+              onAutoHideSourceColumnOnTimelineOpenChange={handleAutoHideSourceColumnOnTimelineOpenChange}
             />,
           )}
         />
@@ -1730,9 +1739,14 @@ function WorkspaceApp() {
 }
 
 const PREVIEW_MUTED_DEFAULT_STORAGE_KEY = 'footage-finder.previewMutedDefault';
+const AUTO_HIDE_SOURCE_COLUMN_ON_TIMELINE_OPEN_STORAGE_KEY = 'footage-finder.autoHideSourceColumnOnTimelineOpen';
 
 function readPreviewMutedDefault() {
   return window.localStorage.getItem(PREVIEW_MUTED_DEFAULT_STORAGE_KEY) !== 'false';
+}
+
+function readAutoHideSourceColumnOnTimelineOpen() {
+  return window.localStorage.getItem(AUTO_HIDE_SOURCE_COLUMN_ON_TIMELINE_OPEN_STORAGE_KEY) !== 'false';
 }
 
 function getDatasetGroupKey(dataset: DatasetItem) {

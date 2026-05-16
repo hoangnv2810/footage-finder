@@ -39,6 +39,7 @@ interface StoryboardPageProps {
   activeDatasetUsableForStoryboard: boolean;
   trimmingScene: string | null;
   previewMutedDefault?: boolean;
+  autoHideSourceColumnOnTimelineOpen?: boolean;
   onRenameStoryboardFolder: (folder: ProductFolderSummary) => void;
   onSelectStoryboardFolder: (folder: ProductFolderSummary) => void;
   onDeleteStoryboardFolder?: (folder: ProductFolderSummary) => void;
@@ -104,6 +105,7 @@ export function StoryboardPage({
   activeDatasetUsableForStoryboard,
   trimmingScene,
   previewMutedDefault = false,
+  autoHideSourceColumnOnTimelineOpen = true,
   onRenameStoryboardFolder,
   onSelectStoryboardFolder,
   onDeleteStoryboardFolder,
@@ -148,6 +150,7 @@ export function StoryboardPage({
   const [expandedFolderId, setExpandedFolderId] = useState<number | null>(activeFolderId);
   const [folderMenuOpenId, setFolderMenuOpenId] = useState<number | null>(null);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(true);
+  const [isSourceColumnHidden, setIsSourceColumnHidden] = useState(false);
   const folderMenuRef = useRef<HTMLDivElement | null>(null);
   const folderRows = storyboardFolders.length > 0
     ? storyboardFolders
@@ -155,9 +158,25 @@ export function StoryboardPage({
   const canUseTimeline = !!selectedSavedStoryboardId;
   const showCollapsedTimeline = canUseTimeline && isTimelineCollapsed;
 
+  const toggleTimelineCollapsed = () => {
+    setIsTimelineCollapsed((current) => {
+      const next = !current;
+      if (autoHideSourceColumnOnTimelineOpen) {
+        setIsSourceColumnHidden(!next);
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     setExpandedFolderId(activeFolderId);
   }, [activeFolderId]);
+
+  useEffect(() => {
+    if (!autoHideSourceColumnOnTimelineOpen || !canUseTimeline) {
+      setIsSourceColumnHidden(false);
+    }
+  }, [autoHideSourceColumnOnTimelineOpen, canUseTimeline]);
 
   useEffect(() => {
     if (folderMenuOpenId === null) return;
@@ -183,7 +202,8 @@ export function StoryboardPage({
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden">
-        <div className="w-[360px] border-r border-border shrink-0 flex flex-col bg-card min-h-0 overflow-hidden">
+        {!isSourceColumnHidden ? (
+        <div data-testid="storyboard-source-column" className="w-[360px] border-r border-border shrink-0 flex flex-col bg-card min-h-0 overflow-hidden">
           <div className="custom-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
             {folderRows.map((row) => {
               const isActive = row.folder.id === activeFolderId;
@@ -335,6 +355,7 @@ export function StoryboardPage({
             </div>
           </div>
         </div>
+        ) : null}
 
         <div className="w-[340px] border-r border-border shrink-0 flex flex-col bg-card min-h-0 overflow-hidden">
           <div className="px-3 py-2.5 border-b border-border shrink-0">
@@ -373,7 +394,7 @@ export function StoryboardPage({
               isLoading={isLoadingStoryboardTimelines}
               isSaving={isMutatingStoryboardTimeline}
               isExporting={isExportingStoryboardTimeline}
-              onToggleCollapsed={() => setIsTimelineCollapsed((value) => !value)}
+              onToggleCollapsed={toggleTimelineCollapsed}
               onCreateTimeline={onCreateStoryboardTimeline}
               onSelectTimeline={onSelectStoryboardTimeline}
               onRenameTimeline={onRenameStoryboardTimeline}

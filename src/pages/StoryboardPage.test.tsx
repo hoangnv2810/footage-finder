@@ -120,10 +120,8 @@ describe('StoryboardPage', () => {
     expect(screen.getByRole('button', { name: /Mic 1 video · 4 cảnh · 0 storyboard/ })).toBeInTheDocument();
     expect(screen.getByText('2 video · 12 cảnh · 2 storyboard')).toBeInTheDocument();
     expect(screen.getByText('2 video · 12 cảnh')).toBeInTheDocument();
-    expect(screen.getByText(/Tạo tự động/)).toBeInTheDocument();
-    expect(screen.getByText(/Import JSON/)).toBeInTheDocument();
     expect(screen.queryByText('Đã copy input vào clipboard.')).not.toBeInTheDocument();
-    expect(screen.getByTestId('storyboard-timeline-slot')).toHaveClass('h-12');
+    expect(screen.getByTestId('storyboard-timeline-slot')).toHaveClass('h-[280px]');
   });
 
   it('selects another folder from the collapsible folder list', () => {
@@ -449,6 +447,8 @@ describe('StoryboardPage', () => {
         onResetStoryboard={vi.fn()}
       />,
     );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Loa 1/ })[1]);
 
     expect(screen.getByText('v2')).toBeInTheDocument();
     expect(screen.queryByText('v987654321')).not.toBeInTheDocument();
@@ -940,5 +940,71 @@ describe('StoryboardPage', () => {
 
     expect(onAddMatchToTimeline).toHaveBeenCalledTimes(1);
     expect(onAddMatchToTimeline).toHaveBeenCalledWith(match);
+  });
+
+  it('hides the source column when opening timeline and restores it when collapsing timeline', () => {
+    render(
+      <StoryboardPage
+        storyboardFolder={{ id: 12, name: 'Loa', isSystem: false }}
+        storyboardFolders={[
+          { folder: { id: 12, name: 'Loa', isSystem: false }, sourceSummary: { videoCount: 1, sceneCount: 4 }, storyboardCount: 1 },
+        ]}
+        storyboardSourceSummary={{ videoCount: 1, sceneCount: 4 }}
+        storyboardProductDescription="Mô tả sản phẩm"
+        storyboardProductName="Loa"
+        storyboardGender="Audio"
+        storyboardAudience=""
+        storyboardTone=""
+        storyboardRegion=""
+        storyboardScript="Hook"
+        storyboardSelectedVersionIds={[]}
+        storyboardSources={[]}
+        storyboardResult={null}
+        savedStoryboards={[]}
+        selectedSavedStoryboardId="storyboard-1"
+        loadingSavedStoryboardId={null}
+        selectedStoryboardBeatId={null}
+        storyboardPreviewMatch={null}
+        {...storyboardTimelineProps}
+        isGeneratingStoryboard={false}
+        activeDataset={null}
+        activeDatasetUsableForStoryboard
+        trimmingScene={null}
+        autoHideSourceColumnOnTimelineOpen
+        onRenameStoryboardFolder={vi.fn()}
+        onSelectStoryboardFolder={vi.fn()}
+        onStoryboardProductDescriptionChange={vi.fn()}
+        onStoryboardProductNameChange={vi.fn()}
+        onStoryboardGenderChange={vi.fn()}
+        onStoryboardAudienceChange={vi.fn()}
+        onStoryboardToneChange={vi.fn()}
+        onStoryboardRegionChange={vi.fn()}
+        onStoryboardScriptChange={vi.fn()}
+        onCopyInput={vi.fn()}
+        onCopyScriptPrompt={vi.fn()}
+        onImportStoryboard={vi.fn()}
+        onSelectSavedStoryboard={vi.fn()}
+        onDeleteSavedStoryboard={vi.fn()}
+        onRenameSavedStoryboard={vi.fn()}
+        onToggleSourceVersion={vi.fn()}
+        onGenerateStoryboard={vi.fn()}
+        onSelectBeat={vi.fn()}
+        onPlayStoryboardMatch={vi.fn()}
+        onTrimMatch={vi.fn()}
+        onStoryboardPlayerRef={vi.fn()}
+        onStoryboardTimeUpdate={vi.fn()}
+        onResetStoryboard={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('storyboard-source-column')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mở timeline bản dựng' }));
+
+    expect(screen.queryByTestId('storyboard-source-column')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thu gọn timeline bản dựng' }));
+
+    expect(screen.getByTestId('storyboard-source-column')).toBeInTheDocument();
   });
 });
